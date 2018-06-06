@@ -7,10 +7,8 @@ git:
 
 before_install:
   - sudo apt-get update -qq
-  # Pre-reqs for building omsagent and omi
-  - sudo apt-get install -qq pkg-config make ruby bison g++ rpm librpm-dev libpam0g-dev libssl-dev libmysqlclient-dev libkrb5-dev
-  # Pre-reqs for building auoms
-  - sudo apt-get install cmake libboost-dev libboost-test-dev libaudit-dev libauparse-dev unzip
+  # Pre-reqs for building omsagent
+  - sudo apt-get install -qq pkg-config make ruby bison g++ rpm librpm-dev libpam0g-dev libssl-dev libmysqlclient-dev libkrb5-dev cpio
   - sudo groupadd omiusers
   - rvm use system                 # Use system ruby (v1.9.3p484) instead of ruby provided by rvm
   - sed -i 's/--no-ri//' ~/.gemrc  # ri data from installed gems is required for our build
@@ -24,7 +22,7 @@ install:
   - cd Microsoft/Build-OMS-Agent-for-Linux
   # change url from ssh to https for submodules, travis-ci cannot download a submodule that isn’t on a public url
   - sed -i 's/git@github.com:/https:\/\/github.com\//' .gitmodules 
-  - git submodule update --init --recursive dsc omi opsmgr-kits pal auoms scxcore-kits
+  - git submodule update --init --recursive auoms-kits dsc-kits omi-kits opsmgr-kits pal scxcore-kits
   - git clone https://github.com/Microsoft/OMS-Agent-for-Linux.git omsagent 
   - cd omsagent
   # change url from ssh to https for submodules ruby and fluentd
@@ -41,8 +39,6 @@ before_script:
   # pwd: /home/travis/build/Microsoft/Build-OMS-Agent-for-Linux/omsagent/build
   # Since 'build' is a keyword for travis-CI, change Makefile to substitute 'omsagent/build' instead of 'build'
   - sed -i 's/(subst \/build,,$(CURDIR))/(subst omsagent\/build,omsagent,$(CURDIR))/' Makefile 
-  # Substitue 'build' in Makefile for auoms as well
-  - sed -i 's/(subst \/build,,$(CURDIR))/(subst auoms\/build,auoms,$(CURDIR))/' ../../auoms/build/Makefile
 
 script:
   - ./configure --enable-debug

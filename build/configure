@@ -2,33 +2,19 @@
 
 home_dir=`(cd ~/; pwd -P)`
 base_dir=`(cd ..; pwd -P)`
-scxomi_dir=`(cd ../../omi/Unix; pwd -P)`
 scxpal_dir=`(cd ../../pal; pwd -P)`
-auoms_dir=`(cd ../../auoms; pwd -P)`
 
 enable_debug=""
 enable_debug_flag=0
 enable_purify_agent=""
 enable_purify_server=""
-enable_omi_tools=""
-enable_omi_tools_flag=0
 opensource_distro=0
 build_type=Release
 ULINUX=0
 NOULINIX=0
 
-if [ ! -d "$scxomi_dir" ]; then
-    echo "OMI directory ($scxomi_dir) does not exist" >& 2
-    exit 1
-fi
-
 if [ ! -d "$scxpal_dir" ]; then
     echo "PAL directory ($scxpal_dir) does not exist" >& 2
-    exit 1
-fi
-
-if [ ! -d "$auoms_dir" ]; then
-    echo "AUOMS directory ($auoms_dir) does not exist" >& 2
     exit 1
 fi
 
@@ -232,8 +218,6 @@ apply_patch ${base_dir}/source/ext/patches/fluentd/in_exec.patch ${base_dir}/sou
 
 # No errors allowed from this point forward
 set -e
-
-auoms_configure_quals="${enable_debug} ${enable_ulinux}"
 
 if [ "$ULINUX" -eq 1 -a "$opensource_distro" -eq 1 ]; then
     echo "*** ULINUX not permitted for open source distributions; ULINUX disabled ***" >& 2
@@ -508,10 +492,6 @@ if [ "$ULINUX" = "1" ]; then
         echo "RUBY_CONFIGURE_QUALS_110=( ${ruby_configure_quals_110[@]} )" >> config.mak
     fi
 fi
-
-# Fix permissions in case they aren't executable - and then configure AUOMS
-chmod ug+x ${auoms_dir}/build/configure
-(cd ${auoms_dir}/build && ./configure ${auoms_configure_quals})
 
 # Display some information for our own configuration
 if [ $NOOPTIMIZE -eq 1 ]; then

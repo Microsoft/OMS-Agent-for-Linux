@@ -5,12 +5,11 @@
 #-------------------------------------------------------------------------------
 SHELL=/bin/bash
 BASE_DIR := $(subst /build,,$(CURDIR))
-OMI_ROOT := $(shell cd ../../omi/Unix; pwd -P)
 OMI_KITS := $(shell cd ../../omi-kits; pwd -P)
+DSC_KITS := $(shell cd ../../dsc-kits; pwd -P)
 SCX_CORE_KITS := $(shell cd ../../scxcore-kits; pwd -P)
 PAL_DIR := $(shell cd ../../pal; pwd -P)
-DSC_DIR := $(shell cd ../../dsc; pwd -P)
-AUOMS_DIR := $(shell cd ../../auoms; pwd -P)
+AUOMS_KITS := $(shell cd ../../auoms-kits; pwd -P)
 
 PF_POSIX := 1
 include $(BASE_DIR)/build/config.mak
@@ -21,9 +20,6 @@ ifndef ENABLE_DEBUG
 $(error "ENABLE_DEBUG is not set.  Please re-run configure")
 endif
 
-DSC_TARGET_DIR := $(DSC_DIR)/release
-AUOMS_TARGET_DIR := $(AUOMS_DIR)/target/$(BUILD_CONFIGURATION)
-
 RUBY_DIR := $(BASE_DIR)/source/ext/ruby
 # This Ruby version number refers only to the major/minor version (not teeny)
 #      of the Ruby installed with the OMSAgent
@@ -33,6 +29,7 @@ PLUGINS_DIR := $(BASE_DIR)/source/code/plugins
 
 INTERMEDIATE_DIR=$(BASE_DIR)/intermediate/$(BUILD_CONFIGURATION)
 TARGET_DIR := $(BASE_DIR)/target/$(BUILD_CONFIGURATION)
+OMI_EXTRACT_DIR := $(INTERMEDIATE_DIR)/omi-extract
 
 SEPOLICY_SRC_DIR=$(BASE_DIR)/installer/selinux
 SEPOLICY_DIR=$(INTERMEDIATE_DIR)/selinux
@@ -41,13 +38,9 @@ SEPOLICY_DIR_EL6=$(INTERMEDIATE_DIR)/selinux.el6
 ifeq ($(ULINUX),1)
 # Doesn't matter what version of SSL/Ruby we use to compile or link the OMI plugin
 RUBY_DEST_DIR := $(INTERMEDIATE_DIR)/098/ruby
-OMI_LIBRARY_DIR := $(OMI_ROOT)/output_openssl_0.9.8/lib
 else
 RUBY_DEST_DIR := $(INTERMEDIATE_DIR)/ruby
-OMI_LIBRARY_DIR := $(OMI_ROOT)/output/lib
 endif
-
-OMI_LIBRARY_LIB_BASE := $(OMI_LIBRARY_DIR)/libbase.a
 
 # Version of Ruby for test purposes only
 RUBY_TESTING_DIR := $(shell echo "$(RUBY_CONFIGURE_QUALS_TESTINS)" | cut -d= -f2)
@@ -62,7 +55,7 @@ endif
 # Need to use RUBY_COMPILE_FLAGS when compiling code that uses C Ruby interfaces
 # (Note that "-Wshadow -Wredundant-decls" don't work with Ruby v2.4.0)
 RUBY_COMPILE_FLAGS := $(DEBUG_FLAGS) -D_REENTRANT -fstack-protector-all -Wall -fno-nonansi-builtins -Woverloaded-virtual -Wformat -Wformat-security -Wcast-align -Wswitch-enum  -Wwrite-strings  -Werror -Wcast-qual -fPIC # -Wshadow -Wredundant-decls
-PLUGIN_LINK_LIBRARIES := -Wl,-rpath=/opt/omi/lib -L$(OMI_LIBRARY_DIR) -lrt -pthread -lmi
+PLUGIN_LINK_LIBRARIES := -Wl,-rpath=/opt/omi/lib -L$(OMI_EXTRACT_DIR)/opt/omi/lib -lrt -pthread -lmi
 SHARED_FLAGS := -shared
 
 # Support for installbuilder
@@ -100,7 +93,7 @@ endif
 # Plugins
 IN_PLUGINS_LIB := $(INTERMEDIATE_DIR)/Libomi.so
 
-OMI_INCLUDES := -I$(OMI_ROOT) -I$(OMI_ROOT)/common -I$(OMI_ROOT)/common/linux -I$(OMI_ROOT)/base -I$(OMI_ROOT)/output/include
+OMI_INCLUDES := -I$(OMI_EXTRACT_DIR)/usr/include/omi/common
 PAL_INCLUDES := -I$(PAL_DIR)/source/code/include/util
 RUBY_INCLUDES := -I$(RUBY_DEST_DIR)/include/ruby-$(RUBY_VER)/$(RUBY_ARCM) -I$(RUBY_DEST_DIR)/include/ruby-$(RUBY_VER)
 
@@ -121,7 +114,7 @@ SYSTEST_CONFIG := $(BASE_DIR)/test/config/systest.conf
 .PHONY: all clean clean-ruby distclean clean-status kit
 .PHONY: tests test omstest unittest systemtest systemtestrb
 
-all : $(OMI_LIBRARY_LIB_BASE) $(DSC_TARGET_DIR) $(RUBY_TESTING_DIR) $(RUBY_DEST_DIR) $(IN_PLUGINS_LIB) sepolicy $(AUOMS_TARGET_DIR)/auoms-bundle-test.sh kit
+all : $(RUBY_TESTING_DIR) $(RUBY_DEST_DIR) $(IN_PLUGINS_LIB) sepolicy kit
         # After a successful make, undo the Ruby patches for sequential builds from old branches
 	@echo "Cleaning patched Ruby files..."
 	cd $(BASE_DIR)/source/ext/ruby; git checkout -- ext/openssl/ossl_ssl.c ext/openssl/extconf.rb
@@ -154,19 +147,7 @@ clean-ruby : clean
 	@echo "Cleaning fluentd source directory ..."
 	cd $(FLUENTD_DIR); git clean -dfx
 
-clean-dsc : clean
-	-make -C $(DSC_DIR) clean
-	-$(RMDIR) $(DSC_DIR)/config.mak $(DSC_DIR)/intermediate $(DSC_DIR)/output $(DSC_DIR)/release
-	-$(RM) $(DSC_DIR)/omi-1.0.8
-
-clean-auoms : clean
-	-make -C $(AUOMS_DIR)/build distclean
-	@$(ECHO) "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-	@$(ECHO) "!!!!! PLEASE RE-RUN THE ./configure SCRIPT !!!!!"
-	@$(ECHO) "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-
-distclean : clean clean-ruby clean-dsc clean-auoms
-	-$(RMDIR) $(OMI_ROOT)/output*
+distclean : clean clean-ruby
 
 	cd $(BASE_DIR)/source/ext/fluentd; git checkout -- lib/fluent/env.rb lib/fluent/plugin/in_exec.rb
 	cd $(BASE_DIR)/source/ext/ruby; git checkout -- ext/openssl/ossl_ssl.c ext/openssl/extconf.rb
@@ -176,43 +157,6 @@ distclean : clean clean-ruby clean-dsc clean-auoms
 
 clean-status :
 	@$(ECHO) "========================= Performing make clean"
-
-#--------------------------------------------------------------------------------
-# Build OMI project (configured for the OMS project)
-
-$(OMI_LIBRARY_LIB_BASE) :
-	@$(ECHO) "========================= Performing Building OMI Project"
-ifeq ($(ULINUX),1)
-	cd $(OMI_ROOT); ./configure --enable-microsoft --enable-ulinux
-else
-	cd $(OMI_ROOT); ./configure --enable-microsoft
-endif
-	$(MAKE) -C $(OMI_ROOT) all
-
-#--------------------------------------------------------------------------------
-# Build DSC project (configured for the OMS project)
-#
-# Note: This expects that OMI is already built! Take care of your
-# ordering on the 'all' target!
-
-$(DSC_TARGET_DIR) : $(OMI_LIBRARY_LIB_BASE)
-ifeq ($(ULINUX),1)
-	@$(ECHO) "========================= Performing Building DSC Project"
-	cd $(DSC_DIR); ./configure --oms
-	ln -fs $(OMI_ROOT) $(DSC_DIR)/omi-1.0.8
-	cd $(OMI_ROOT); $(RMDIR) output; ln -s output_openssl_0.9.8 output
-	$(MAKE) -C $(DSC_DIR) dsc098
-	$(MAKE) -C $(DSC_DIR) dsckit098
-	cd $(OMI_ROOT); $(RMDIR) output; ln -s output_openssl_1.0.0 output
-	$(MAKE) -C $(DSC_DIR) dsc100
-	$(MAKE) -C $(DSC_DIR) dsckit100
-ifeq ($(PF_ARCH),x64)
-	cd $(OMI_ROOT); $(RMDIR) output; ln -s output_openssl_1.1.0 output
-	$(MAKE) -C $(DSC_DIR) dsc110
-	$(MAKE) -C $(DSC_DIR) dsckit110
-endif
-	cd $(OMI_ROOT); $(RMDIR) output
-endif
 
 #--------------------------------------------------------------------------------
 # Build SELinux policy modules for omsagent-logrotate
@@ -241,12 +185,6 @@ $(SEPOLICY_DIR)/omsagent-logrotate.pp : $(SEPOLICY_SRC_DIR)/omsagent-logrotate.t
 	$(MKPATH) $(SEPOLICY_DIR)
 	touch $(SEPOLICY_DIR)/omsagent-logrotate.pp
 endif
-
-#--------------------------------------------------------------------------------
-# Build AUOMS project
-
-$(AUOMS_TARGET_DIR)/auoms-bundle-test.sh : 
-	$(MAKE) -C $(AUOMS_DIR)/build all
 
 #--------------------------------------------------------------------------------
 # Build the version of Ruby that we test with
@@ -306,11 +244,23 @@ $(INTERMEDIATE_DIR)/%.o : $(BASE_DIR)/%.c
 STATIC_PLUGINS_SRCFILES = $(PLUGINS_DIR)/omi_interface.cpp
 STATIC_PLUGINS_OBJFILES = $(call src_to_obj,$(STATIC_PLUGINS_SRCFILES))
 
+# We need omi library and header files, we extract them in intermediate folder
+# from omi rpm package (for lib) and omidev.tar.gz (for headers)
+$(OMI_EXTRACT_DIR) :
+	$(MKPATH) $(INTERMEDIATE_DIR)
+
+	$(MKPATH) $(OMI_EXTRACT_DIR)
+	tar -xzvf $(BASE_DIR)/../omidev.tar.gz -C $(OMI_EXTRACT_DIR)
+
+	$(COPY) $(OMI_KITS)/release/omi-*.ssl_098.ulinux.$(PF_ARCH).rpm $(OMI_EXTRACT_DIR)
+	cd $(OMI_EXTRACT_DIR); rpm2cpio $(OMI_EXTRACT_DIR)/omi-*.rpm | cpio -idv
+
 $(IN_PLUGINS_LIB) : CXXFLAGS = $(RUBY_COMPILE_FLAGS)
 $(IN_PLUGINS_LIB) : INCLUDES = $(RUBY_INCLUDES) $(OMI_INCLUDES) $(PAL_INCLUDES)
-$(IN_PLUGINS_LIB) : $(STATIC_PLUGINS_OBJFILES)
+
+$(IN_PLUGINS_LIB) : $(OMI_EXTRACT_DIR) $(STATIC_PLUGINS_OBJFILES)
 	@echo "========================= Performing Building input plugins"
-	$(MKPATH) $(INTERMEDIATE_DIR)
+
 	$(MKPATH) $(TARGET_DIR)
 	g++ $(SHARED_FLAGS) $(RUBY_INCLUDES) $(OMI_INCLUDES) $(PAL_INCLUDES) -o $@ $(STATIC_PLUGINS_OBJFILES) $(PLUGIN_LINK_LIBRARIES)
 
@@ -320,17 +270,12 @@ $(IN_PLUGINS_LIB) : $(STATIC_PLUGINS_OBJFILES)
 # Build the packages via installbuilder
 #
 # While the "formal build" only builds ULINUX, we may build something else for DEV purposes.
-# Assume we ALWAYS build RPM, but only build DPKG if --enable-ulinux is speified in configure.
+# Assume we ALWAYS build RPM, but only build DPKG if --enable-ulinux is specified in configure.
 
 ifeq ($(ULINUX),1)
 
-kit : $(TARGET_DIR)/$(OUTPUT_PACKAGE_PREFIX).sh $(TARGET_DIR)/dsc \
+kit : $(TARGET_DIR)/$(OUTPUT_PACKAGE_PREFIX).sh \
       $(TARGET_DIR)/$(OUTPUT_PACKAGE_PREFIX_RPM).sh $(TARGET_DIR)/$(OUTPUT_PACKAGE_PREFIX_DEB).sh 
-
-$(TARGET_DIR)/dsc : $(DSC_TARGET_DIR)
-	@echo "========================= Performing Copying DSC resources"
-	$(MKPATH) $(TARGET_DIR)/dsc; $(COPY) $(DSC_TARGET_DIR)/*.zip $(TARGET_DIR)/dsc/
-
 
 $(TARGET_DIR)/$(OUTPUT_PACKAGE_PREFIX).sh : $(INTERMEDIATE_DIR)/$(OUTPUT_PACKAGE_PREFIX).tar
 	@echo "========================= Performing Building shell bundle"
@@ -347,7 +292,7 @@ $(TARGET_DIR)/$(OUTPUT_PACKAGE_PREFIX_DEB).sh : $(INTERMEDIATE_DIR)/$(OUTPUT_PAC
 	../installer/bundle/create_bundle.sh $(TARGET_DIR) $(INTERMEDIATE_DIR) $(OUTPUT_PACKAGE_PREFIX_DEB).tar "DPKG"
 
 ifeq ($(PF_ARCH),x64)
-$(INTERMEDIATE_DIR)/$(OUTPUT_PACKAGE_PREFIX).tar : $(RUBY_DEST_DIR) $(IN_PLUGINS_LIB) $(AUOMS_TARGET_DIR)/auoms-bundle-test.sh \
+$(INTERMEDIATE_DIR)/$(OUTPUT_PACKAGE_PREFIX).tar : $(RUBY_DEST_DIR) $(IN_PLUGINS_LIB) \
 	$(INTERMEDIATE_DIR)/098/$(OUTPUT_PACKAGE_PREFIX).rpm $(INTERMEDIATE_DIR)/098/$(OUTPUT_PACKAGE_PREFIX).deb \
 	$(INTERMEDIATE_DIR)/100/$(OUTPUT_PACKAGE_PREFIX).rpm $(INTERMEDIATE_DIR)/100/$(OUTPUT_PACKAGE_PREFIX).deb \
 	$(INTERMEDIATE_DIR)/110/$(OUTPUT_PACKAGE_PREFIX).rpm $(INTERMEDIATE_DIR)/110/$(OUTPUT_PACKAGE_PREFIX).deb
@@ -357,17 +302,11 @@ $(INTERMEDIATE_DIR)/$(OUTPUT_PACKAGE_PREFIX).tar : $(RUBY_DEST_DIR) $(IN_PLUGINS
 	# Gather the DSC bits that we need
 	$(RM) $(INTERMEDIATE_DIR)/098/omsconfig-*.{rpm,deb} $(INTERMEDIATE_DIR)/100/omsconfig-*.{rpm,deb} $(INTERMEDIATE_DIR)/110/omsconfig-*.{rpm,deb}
 
-	cd $(DSC_DIR)/release; $(COPY) `ls omsconfig-*.ssl_098.*.rpm | sort | tail -1` $(INTERMEDIATE_DIR)/098
-	cd $(DSC_DIR)/release; $(COPY) `ls omsconfig-*.ssl_098.*.deb | sort | tail -1` $(INTERMEDIATE_DIR)/098
-	cd $(INTERMEDIATE_DIR)/098; for f in omsconfig-*.{rpm,deb}; do SOURCE=$$f; DEST=`echo $$SOURCE | sed 's/.ssl_098././'` ; $(MV) $$SOURCE $$DEST; done
+	cd $(DSC_KITS)/release; $(COPY) `ls 098/omsconfig-*.$(PF_ARCH).{rpm,deb}` $(INTERMEDIATE_DIR)/098
 
-	cd $(DSC_DIR)/release; $(COPY) `ls omsconfig-*.ssl_100.*.rpm | sort | tail -1` $(INTERMEDIATE_DIR)/100
-	cd $(DSC_DIR)/release; $(COPY) `ls omsconfig-*.ssl_100.*.deb | sort | tail -1` $(INTERMEDIATE_DIR)/100
-	cd $(INTERMEDIATE_DIR)/100; for f in omsconfig-*.{rpm,deb}; do SOURCE=$$f; DEST=`echo $$SOURCE | sed 's/.ssl_100././'` ; $(MV) $$SOURCE $$DEST; done
+	cd $(DSC_KITS)/release; $(COPY) `ls 100/omsconfig-*.$(PF_ARCH).{rpm,deb}` $(INTERMEDIATE_DIR)/100
 
-	cd $(DSC_DIR)/release; $(COPY) `ls omsconfig-*.ssl_110.*.rpm | sort | tail -1` $(INTERMEDIATE_DIR)/110
-	cd $(DSC_DIR)/release; $(COPY) `ls omsconfig-*.ssl_110.*.deb | sort | tail -1` $(INTERMEDIATE_DIR)/110
-	cd $(INTERMEDIATE_DIR)/110; for f in omsconfig-*.{rpm,deb}; do SOURCE=$$f; DEST=`echo $$SOURCE | sed 's/.ssl_110././'` ; $(MV) $$SOURCE $$DEST; done
+	cd $(DSC_KITS)/release; $(COPY) `ls 110/omsconfig-*.$(PF_ARCH).{rpm,deb}` $(INTERMEDIATE_DIR)/110
 
 	# Pick up the OSS (Open Source) providers
 	$(RMDIR) $(INTERMEDIATE_DIR)/oss-kits
@@ -378,8 +317,8 @@ $(INTERMEDIATE_DIR)/$(OUTPUT_PACKAGE_PREFIX).tar : $(RUBY_DEST_DIR) $(IN_PLUGINS
 	# Pick up other bundled packages
 	$(RMDIR) $(INTERMEDIATE_DIR)/bundles
 	$(MKPATH) $(INTERMEDIATE_DIR)/bundles
-	cd $(AUOMS_TARGET_DIR); $(COPY) `ls auoms-*.universal.$(PF_ARCH).sh | sort | tail -1` $(INTERMEDIATE_DIR)/bundles
-	$(COPY) $(AUOMS_TARGET_DIR)/auoms-bundle-test.sh $(INTERMEDIATE_DIR)/bundles
+	cd $(AUOMS_KITS)/release; $(COPY) `ls auoms-*.universal.$(PF_ARCH).sh | sort | tail -1` $(INTERMEDIATE_DIR)/bundles
+	cd $(AUOMS_KITS)/release; $(COPY) auoms-bundle-test.sh $(INTERMEDIATE_DIR)/bundles
 
 	# Gather the SCX bits that we need
 	# Note: We take care to only copy the latest version if there are multiple versions
@@ -432,7 +371,7 @@ $(INTERMEDIATE_DIR)/$(OUTPUT_PACKAGE_PREFIX_DEB).tar : $(RUBY_DEST_DIR) $(IN_PLU
 	cd $(INTERMEDIATE_DIR); tar cvf $(OUTPUT_PACKAGE_PREFIX_DEB).tar 098/*.deb 100/*.deb 110/*.deb oss-kits/*
 
 else
-$(INTERMEDIATE_DIR)/$(OUTPUT_PACKAGE_PREFIX).tar : $(RUBY_DEST_DIR) $(IN_PLUGINS_LIB) $(AUOMS_TARGET_DIR)/auoms-bundle-test.sh \
+$(INTERMEDIATE_DIR)/$(OUTPUT_PACKAGE_PREFIX).tar : $(RUBY_DEST_DIR) $(IN_PLUGINS_LIB) \
 	$(INTERMEDIATE_DIR)/098/$(OUTPUT_PACKAGE_PREFIX).rpm $(INTERMEDIATE_DIR)/098/$(OUTPUT_PACKAGE_PREFIX).deb \
 	$(INTERMEDIATE_DIR)/100/$(OUTPUT_PACKAGE_PREFIX).rpm $(INTERMEDIATE_DIR)/100/$(OUTPUT_PACKAGE_PREFIX).deb
 
@@ -441,13 +380,9 @@ $(INTERMEDIATE_DIR)/$(OUTPUT_PACKAGE_PREFIX).tar : $(RUBY_DEST_DIR) $(IN_PLUGINS
 	# Gather the DSC bits that we need
 	$(RM) $(INTERMEDIATE_DIR)/098/omsconfig-*.{rpm,deb} $(INTERMEDIATE_DIR)/100/omsconfig-*.{rpm,deb}
 
-	cd $(DSC_DIR)/release; $(COPY) `ls omsconfig-*.ssl_098.*.rpm | sort | tail -1` $(INTERMEDIATE_DIR)/098
-	cd $(DSC_DIR)/release; $(COPY) `ls omsconfig-*.ssl_098.*.deb | sort | tail -1` $(INTERMEDIATE_DIR)/098
-	cd $(INTERMEDIATE_DIR)/098; for f in omsconfig-*.{rpm,deb}; do SOURCE=$$f; DEST=`echo $$SOURCE | sed 's/.ssl_098././'` ; $(MV) $$SOURCE $$DEST; done
+	cd $(DSC_KITS)/release; $(COPY) `ls 098/omsconfig-*.$(PF_ARCH).{rpm,deb}` $(INTERMEDIATE_DIR)/098
 
-	cd $(DSC_DIR)/release; $(COPY) `ls omsconfig-*.ssl_100.*.rpm | sort | tail -1` $(INTERMEDIATE_DIR)/100
-	cd $(DSC_DIR)/release; $(COPY) `ls omsconfig-*.ssl_100.*.deb | sort | tail -1` $(INTERMEDIATE_DIR)/100
-	cd $(INTERMEDIATE_DIR)/100; for f in omsconfig-*.{rpm,deb}; do SOURCE=$$f; DEST=`echo $$SOURCE | sed 's/.ssl_100././'` ; $(MV) $$SOURCE $$DEST; done
+	cd $(DSC_KITS)/release; $(COPY) `ls 100/omsconfig-*.$(PF_ARCH).{rpm,deb}` $(INTERMEDIATE_DIR)/100
 
 	# Pick up the OSS (Open Source) providers
 	$(RMDIR) $(INTERMEDIATE_DIR)/oss-kits
@@ -458,8 +393,8 @@ $(INTERMEDIATE_DIR)/$(OUTPUT_PACKAGE_PREFIX).tar : $(RUBY_DEST_DIR) $(IN_PLUGINS
 	# Pick up other bundled packages
 	$(RMDIR) $(INTERMEDIATE_DIR)/bundles
 	$(MKPATH) $(INTERMEDIATE_DIR)/bundles
-	cd $(AUOMS_TARGET_DIR); $(COPY) `ls auoms-*.universal.$(PF_ARCH).sh | sort | tail -1` $(INTERMEDIATE_DIR)/bundles
-	$(COPY) $(AUOMS_TARGET_DIR)/auoms-bundle-test.sh $(INTERMEDIATE_DIR)/bundles
+	cd $(AUOMS_KITS)/release; $(COPY) `ls auoms-*.universal.$(PF_ARCH).sh | sort | tail -1` $(INTERMEDIATE_DIR)/bundles
+	cd $(AUOMS_KITS)/release; $(COPY) auoms-bundle-test.sh $(INTERMEDIATE_DIR)/bundles
 
 	# Gather the SCX bits that we need
 	# Note: We take care to only copy the latest version if there are multiple versions
