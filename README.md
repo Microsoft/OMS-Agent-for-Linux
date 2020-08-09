@@ -68,7 +68,7 @@ If you are using a distro or version that is not currently supported and doesn't
 * SUSE Linux Enterprise Server 12 and 15
 ### 32-bit
 * CentOS 6
-* Oracle Linux 6
+* Oracle Linux 6 and 7
 * Red Hat Enterprise Linux Server 6
 * Debian GNU/Linux 8 and 9
 * Ubuntu Linux 14.04 LTS and 16.04 LTS
