@@ -25,10 +25,11 @@ module OperationModule
         buffer_queue_limit = record['config']['buffer_queue_limit'].to_i
         buffer_queue_length = record['buffer_queue_length']
         if buffer_queue_limit != 0 && (buffer_queue_length * 100 / buffer_queue_limit) >= BUFFER_QUEUE_WARNING_THRESHOLD_PERCENTAGE
+          computer = OMS::Common.get_hostname or "Unknown host"
           return {
             "Timestamp"=>OMS::Common.format_time(time),
             "OperationStatus"=>"Warning",
-            "Computer"=>`hostname`.strip,
+            "Computer"=>computer,
             "Detail"=>"OMS Agent for Linux buffer queue is 90% full - adjust agent configuration for higher throughput.",
             "Category"=>"OMS Agent for Linux buffer is 90% full",
             "Solution"=>"Log Management",
@@ -69,9 +70,12 @@ module OperationModule
     end
  
     def filter_and_wrap(tag, record, time)
+      return {} unless tag.is_a?(String)
       tag_type = tag.match(/[^\.]*$/) 
       case tag_type[0]
-      when "buffer"
+      #when "buffer" # Legacy case commented out for now.
+      #  data_item = filter(record, time)
+      when "health"
         data_item = filter(record, time)
       when "dsc" 
         data_item = filter_generic(record, time)
@@ -79,16 +83,13 @@ module OperationModule
         data_item = filter_auditd_plugin(record, time)
       end
 
-      if (data_item != nil and data_item.size > 0)
-        wrapper = {
-         "DataType"=>"OPERATION_BLOB",
-         "IPName"=>"LogManagement",
-         "DataItems"=>[data_item]
-        }
-        return wrapper
-      else
-        return {}
-      end
+      return {} if data_item.nil?
+      return {} if data_item.length == 0
+      return {
+        "DataType"=>"OPERATION_BLOB",
+        "IPName"=>"LogManagement",
+        "DataItems"=>[data_item]
+      }
     end
 
   end

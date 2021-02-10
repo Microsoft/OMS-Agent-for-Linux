@@ -59,10 +59,89 @@ class OperationLib_Test < Test::Unit::TestCase
     @@operation_lib.filter(record, Time.now)
   end
 
-  # wrapper to call generic filter
   def call_generic_filter(record)
-    @@operation_lib.filter_generic(record, Time.now)
+    wrapper_record = @@operation_lib.filter_generic(record, Time.now)
+  end
+
+    # Note:  I haven't been able to find a helpful sounding name for any of the the
+    # primary data record passed to these methods, nor what is labeled the DataItems
+    # record which envelopes the former, nor the "wrapper", which envelopes the DataItems.
+    # For now I will therefore call them as such:
+    #   1.  Primary Data Record
+    #   2.  Data Items Record
+    #   3.  Wrapper Record
+    # Given all these have the aspect of minimalist incremental additions rather
+    # than designed patterns, a recommendation should be outstanding for consolidating
+    # the patterns to classes or the equivalent across both omsagent and dsc, IMHO.  XC
+
+  TestPrimaryRecords = [
+    { :Pass => false,   :Type => :Bad,            :Evoke => false,  :Record => nil },
+    { :Pass => false,   :Type => :Bad,            :Evoke => false,  :Record => "" },
+    { :Pass => false,   :Type => :Bad,            :Evoke => false,  :Record => 10 },
+    { :Pass => false,   :Type => :Bad,            :Evoke => false,  :Record => {} },
+    { :Pass => true,    :Type => 'health',        :Evoke => false,  :Record => {"type"=>"out_oms", "config"=>{"buffer_queue_limit"=>"10"}, "buffer_queue_length"=>8} },
+    { :Pass => true,    :Type => 'health',        :Evoke => true,   :Record => {"type"=>"out_oms", "config"=>{"buffer_queue_limit"=>"10"}, "buffer_queue_length"=>9} },
+    { :Pass => true,    :Type => 'dsc',           :Evoke => true,   :Record => {"message"=>"Now is the time that all good engineers fully test their code."} },
+    { :Pass => true,    :Type => 'dsc',           :Evoke => false,  :Record => {"other stuff"=>"any data"} },
+    { :Pass => true,    :Type => 'auditd_plugin', :Evoke => true,   :Record => {"message"=>"Now is the time that all good engineers fully test their code."} },
+    { :Pass => true,    :Type => 'auditd_plugin', :Evoke => false,  :Record => {"other stuff"=>"any data"} }
+    ]
+
+  def test_filter_and_wrap_tag_undefined
+    [nil,"",{},"a","healthy","dy/dx"].each do |bad_tag|
+      TestPrimaryRecords.each do |tr|
+        assert_equal({}, @@operation_lib.filter_and_wrap(bad_tag,tr[:Record],Time.now),"All calls with invalid tags should return an empty hash.")
+      end
+    end
+  end
+
+  def test_filter_and_wrap
+    TestPrimaryRecords.each do |tr|
+      wrapper_record = @@operation_lib.filter_and_wrap(tr[:Type],tr[:Record],Time.now)
+
+      if tr[:Type] == :Bad
+        assert_equal({}, wrapper_record,"Should be empty.")
+      else
+        if tr[:Evoke] then
+
+          # All records validation:
+          # Top Wrappings:
+          assert_not_equal({}, wrapper_record,"Should NOT be empty.")
+
+          assert_equal("OPERATION_BLOB",wrapper_record['DataType'],"Should be of DataType 'OPERATION_BLOB'.")
+          assert_equal("LogManagement",wrapper_record['IPName'],"Should be of IPName 'LogManagement'.")
+          assert_equal(1,wrapper_record['DataItems'].length,"Should have one record.")
+          assert_equal(Hash,wrapper_record['DataItems'][0].class,"Should have record of type Hash.")
+
+          dataitem_record = wrapper_record['DataItems'][0] 
+
+          assert(dataitem_record.has_key?('Computer'),"Should have a Computer key.")
+          assert_equal(dataitem_record['Computer'].class,String,"Computer should be a ruby String.")
+          assert(dataitem_record.has_key?('Timestamp'),"Should have a Timestamp key.")
+          assert_false(dataitem_record['Timestamp'].nil?,"Should have a Timestamp object of type .")
+          assert(dataitem_record.has_key?('Detail'),"Should have a Detail key.")
+          assert_equal(dataitem_record['Detail'].class,String,"Detail should be a ruby String.")
+          assert(dataitem_record.has_key?('OperationStatus'),"Should have a OperationStatus key.")
+          assert_equal(dataitem_record['OperationStatus'].class,String,"OperationStatus should be a ruby String.")
+          assert(dataitem_record.has_key?('Category'),"Should have a Category key.")
+          assert_equal(dataitem_record['Category'].class,String,"Category should be a ruby String.")
+          assert(dataitem_record.has_key?('Solution'),"Should have a Solution key.")
+          assert_equal(dataitem_record['Solution'].class,String,"Solution should be a ruby String.")
+
+          # Note about HelpLink, which is empty:
+          #  Should this be ignored for now, refactored to be useful, or removed?
+          case tr[:Type]
+            when 'buffer'
+                assert(dataitem_record.has_key?('HelpLink'),"Should have a HelpLink key.")
+            when 'health'
+                assert(dataitem_record.has_key?('HelpLink'),"Should have a HelpLink key.")
+          end
+        else
+          # Not :Evoke(d) case where no data of importance needed be conveyed:
+          assert_equal({}, wrapper_record,"Should be empty.")
+        end
+      end
+    end
   end
 
 end
-
