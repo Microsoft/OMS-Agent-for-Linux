@@ -79,3 +79,79 @@ If `mysql_logs.conf` is not present in the above location, move it:
 
 9. Go to OMS Log Search and see whether you can find any results:
 ![MySQLSearchView](pictures/MySQLSearchView.PNG?raw=true)
+
+# MySQL Server Custom Metrics Monitoring Solution for Operations Management Suite
+
+If you want to know more about internal metrics of your MySQL instance you can take advantage of the OMS json output and configure it as:
+
+1. Open the file `/etc/opt/microsoft/omsagent/<workspace id>/conf/omsagent.d/mysql_logs.conf` and append the following configuration, don't foget to update with your workspace ID:
+
+
+```
+# Custom info
+
+<source>
+  type exec
+  command '/usr/local/bin/mysql_info.py'
+  format json
+  tag oms.api.MySQL.info
+  run_interval 30s
+</source>
+
+<match oms.api.MySQL.info>
+  type out_oms_api
+  log_level info
+
+  buffer_chunk_limit 5m
+  buffer_type file
+  buffer_path /var/opt/microsoft/omsagent/<workspace id>/state/out_oms_api_mysqlinfo*.buffer
+  buffer_queue_limit 10
+  flush_interval 20s
+  retry_limit 10
+  retry_wait 30s
+</match>
+
+<match oms.api.**>
+  type out_oms_api
+  log_level info
+
+  buffer_chunk_limit 5m
+  buffer_type file
+  buffer_path /var/opt/microsoft/omsagent/<workspace id>/state/out_oms_api*.buffer
+  buffer_queue_limit 10
+  flush_interval 20s
+  retry_limit 10
+  retry_wait 30s
+</match>
+```
+
+Here is a sample of mysql_info.py script:
+
+![mysql_info.py](code_sample/mysql_info.py)
+
+
+2. Ensure that the user `omsagent` has read and execute permissions on the script file:  
+`chmod +x /usr/local/bin/mysql_info.py`  
+
+Output:
+```
+{"active_connections": 12}
+```
+
+
+3. Restart the OMS agent:
+`sudo /opt/microsoft/omsagent/bin/service_control restart`
+
+Check the logs for any outstanding error:
+`tail -f /var/opt/microsoft/omsagent/<workspace id>/log/omsagent.log`
+
+4. Go to OMS Log Search and see whether you can find any results:
+
+```
+// MySQL active connections
+MySQL_CL 
+| project TimeGenerated, active_connections_d
+| render timechart
+```
+
+![MySQLSearchView](pictures/Azure_Log_Analytics_onprem_MySQL_Dashboard.png?raw=true)
