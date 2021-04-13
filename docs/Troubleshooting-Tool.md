@@ -143,7 +143,7 @@ Below is a list of the errors that can be caught by the troubleshooter:
 | ERR_OMICPU_NSSPEM_LIKE | 144 | Similar to OMI 100% CPU bug |
 | ERR_SLAB | 145 | Slabtop issue in checking slab memory |
 | ERR_SLAB_BLOATED | 146 | Slab memory has >300 DNE messages, no dentry |
-| ERR_SLAB_NSSSOFTOKN | 147 | Dentry cahce issue, upgrade nss-softokn to fix |
+| ERR_SLAB_NSSSOFTOKN | 147 | Dentry cache issue, upgrade nss-softokn to fix |
 | ERR_SLAB_NSS | 148 | Dentry cache issue, initialize NSS variable to fix |
 | ERR_LOGROTATE_SIZE | 149 | Logrotate has wrong size formatting |
 | ERR_LOGROTATE | 150 | Logrotate isn't rotating logs |
