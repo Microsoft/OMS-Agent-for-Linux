@@ -55,6 +55,14 @@ class LinuxUpdates
     def getOSShortName(os_short_name = nil, os_version=nil)
         version = ""
         hostOSDetailsMap = getHostOSDetails()
+	  #os short name is not proper for oracle linux at /etc/opt/microsoft/scx/conf/scx-release. this is to return proper short name till scx fixes the issue.
+	  if hostOSDetailsMap.key?("OSFullName") && hostOSDetailsMap.key?("OSShortName")
+			osFullName = hostOSDetailsMap["OSFullName"]
+			osShortName = hostOSDetailsMap["OSShortName"]
+			if osFullName.downcase.include?("oracle") && ! osShortName.downcase.include?("oracle")
+				os_short_name = "Oracle"
+			end
+	  end
 
         # match string of the form (1 or more non . chars)- followed by a . - (1 or more non . chars) - followed by anything
         if hostOSDetailsMap.key?("OSShortName")
@@ -108,6 +116,8 @@ class LinuxUpdates
             else
                 version = @default_version
             end
+	  when "Oracle"
+		   version = "6.0"
         when "SUSE"
             if @os_major_version == "11"
                 version = "11.0" 
