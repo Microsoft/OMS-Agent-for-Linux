@@ -536,12 +536,12 @@ def estCommonFileSize(omsLinuxType):
     reqSize+=getFolderSize(folderName)
     folderName='/etc/opt/microsoft/omsagent/'
     reqSize+=getFolderSize(folderName)
-    reqSize+=os.path.getsize('/var/opt/microsoft/omsconfig/omsconfig.log')
-    reqSize+=os.path.getsize('/var/opt/microsoft/scx/log/scx.log')
+    reqSize+=getFileSize('/var/opt/microsoft/omsconfig/omsconfig.log')
+    reqSize+=getFileSize('/var/opt/microsoft/scx/log/scx.log')
     if(omsLinuxType == 'Ubuntu'):
-       reqSize+=os.path.getsize('/var/log/syslog')
+       reqSize+=getFileSize('/var/log/syslog')
     else:
-       reqSize+=os.path.getsize('/var/log/messages')
+       reqSize+=getFileSize('/var/log/messages')
     return reqSize
 
 '''
@@ -551,7 +551,7 @@ def estExtensionFileSize(omsLinuxType):
     reqSize=0
     folderName='/var/log/azure/Microsoft.EnterpriseCloud.Monitoring.OmsAgentForLinux'
     reqSize+=getFolderSize(folderName)
-    reqSize+=os.path.getsize('/var/log/waagent.log')
+    reqSize+=getFileSize('/var/log/waagent.log')
     folderName='/var/lib/waagent/Microsoft.EnterpriseCloud.Monitoring.OmsAgentForLinux-*'
     reqSize+=getFolderSize(folderName)
     return reqSize
@@ -654,6 +654,15 @@ def getFolderSize(foldername):
     for root, dirs, files in os.walk(foldername):
         fileSize=sum(os.path.getsize(os.path.join(root, name)) for name in files)
     return fileSize
+
+'''
+Get file size, ignoring missing files
+'''
+def getFileSize(filename):
+    if os.path.exists(filename):
+         return os.path.getsize(filename)
+    else:
+         return 0
 
 '''
 Common logic to run any command and check/get its output for further use

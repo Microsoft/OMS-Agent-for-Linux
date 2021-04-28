@@ -67,7 +67,7 @@ not function properly. omsconfig can be installed by rerunning the omsagent inst
         OMS::Log.error_once("Unable to run TestDscConfiguration.py for dsc : #{error}")
         return 1
       end
-      if dsc_status.match("ReturnValue=0") and dsc_status.match("InDesiredState=true")
+      if dsc_status.match('"InDesiredState": true')
         return 0
       else
         return 1

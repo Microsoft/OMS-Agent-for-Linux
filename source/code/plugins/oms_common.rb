@@ -18,6 +18,7 @@ module OMS
     require 'date'
     require 'securerandom'
     require 'resolv-replace'
+    require 'socket'
 
     require_relative 'omslog'
     require_relative 'oms_configuration'
@@ -623,6 +624,21 @@ module OMS
         return @@FQDN
       end
 
+      def get_private_ips
+        begin
+          # Unlike Syslog which could be up to 10K EPS, HB is 1 EPM which obviates need for caching
+          addr_infos = Socket.ip_address_list
+        rescue => error
+          OMS::Log.error_once("Unable to get private IPs: #{error}")
+          return [].to_json
+        end
+    
+        private_ipv4 = addr_infos.select( &:ipv4_private? )      # RFC 1918: {10/8, 172.16/12, 192.168/16}
+        private_ipv6 = addr_infos.select( &:ipv6_unique_local? ) # RFC 4193: {fc00::/7}
+
+        return (private_ipv4 + private_ipv6).map( &:inspect_sockaddr ).to_json
+      end
+
       def get_installed_date(conf_path = "/etc/opt/microsoft/omsagent/sysconf/installinfo.txt")
         return @@InstalledDate if !@@InstalledDate.nil?
 
@@ -894,7 +910,11 @@ module OMS
     
     def get_ip_from_socket(hostname)
       begin
-        return Resolv.getaddress(hostname)
+        Resolv::DNS.open do |dns|
+          dns.timeouts = 3
+          ip = dns.getaddress(hostname)
+          return ip.to_s
+       end
       rescue => error
         OMS::Log.error_once("Unable to resolve the IP of '#{hostname}': #{error}")
         return nil

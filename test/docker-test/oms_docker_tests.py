@@ -205,7 +205,7 @@ def main():
             status_msg = '\rStatus after {0} minutes ['.format(elapsed_time)
             for p in procs.items():
                 status.append(p[1].poll())
-                status_code = 'running' if status[-1] is None else (Color.FAIL + status[-1] + Color.ENDC if status[-1] else 'done')
+                status_code = 'running' if status[-1] is None else (Color.RED + status[-1] + Color.ENDC if status[-1] else 'done')
                 status_msg += ' {0}: {1},'.format(p[0], status_code)
             sys.stdout.write(status_msg[:-1] + ' ]')
             sys.stdout.flush()

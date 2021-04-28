@@ -2,9 +2,9 @@ import re
 
 from error_codes          import *
 from errors               import error_info, is_error, get_input, print_errors
-from errors_tsg           import check_urlopen_errs
 from helpers              import geninfo_lookup, get_curr_oms_version, update_omsadmin
 from .check_pkgs          import get_package_version
+from connect.check_endpts import check_internet_connect
 
 OMSAGENT_URL = "https://raw.github.com/microsoft/OMS-Agent-for-Linux/master/docs/OMS-Agent-for-Linux.md"
 
@@ -95,15 +95,14 @@ def check_oms(interactive):
             return ERR_GETTING_OMS_VER
         # couldn't connect
         else:
-            checked_urlopen = check_urlopen_errs(e)
+            checked_internet = check_internet_connect()
             # issue with connecting to Github specifically
-            if (checked_urlopen == ERR_ENDPT):
+            if (checked_internet == NO_ERROR):
                 print("WARNING: can't connect to {0}: {1}\n Skipping this check...".format(OMSAGENT_URL, e))
                 print("--------------------------------------------------------------------------------")
-            # issue with general internet connectivity / ssl package
+            # issue with general internet connectivity
             else:
-                error_info.append((OMSAGENT_URL, e))
-                return checked_urlopen
+                return checked_internet
 
     # got current version
     else:

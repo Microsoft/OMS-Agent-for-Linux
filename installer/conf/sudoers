@@ -67,4 +67,8 @@ omsagent ALL=(ALL) NOPASSWD: /bin/tail *
 omsagent ALL=(ALL) NOPASSWD: /opt/microsoft/omsconfig/Scripts/OMS_MetaConfigHelper.py *
 omsagent ALL=(ALL) NOPASSWD: /opt/microsoft/omsconfig/Scripts/python3/OMS_MetaConfigHelper.py *
 
+# ContainerLog tail file reader
+omsagent ALL=(ALL) NOPASSWD: /opt/microsoft/omsagent/ruby/bin/ruby /opt/microsoft/omsagent/plugin/containerlogtailfilereader.rb *
+omsagent ALL=(ALL) NOPASSWD: /bin/touch /var/opt/microsoft/docker-cimprov/state/ContainerLogFile.pos.log
+
 # End sudo configuration for omsagent

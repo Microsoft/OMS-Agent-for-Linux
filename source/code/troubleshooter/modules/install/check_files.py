@@ -197,6 +197,11 @@ def check_dirs(dirs, exist_err, perms_err):
 def check_files(files, exist_err, perms_err):
     success = NO_ERROR
     for f in (files.keys()):
+        # skip over omsadmin.conf, as it's created in onboarding
+        if (f.endswith("omsadmin.conf")):
+            print("WARNING: omsadmin.conf file doesn't exist. File should exist after "\
+                    "onboarding successfully (ignore if not installed/onboarded yet).")
+            continue
         # check if file exists
         if (not os.path.isfile(f)):
             exist_err.append(('file', f))

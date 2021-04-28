@@ -198,6 +198,8 @@ MAINTAINER:              'Microsoft Corporation'
 
 /opt/microsoft/omsagent/bin/troubleshooter;                                     source/code/troubleshooter/troubleshooter;                                      755; root; root
 
+/opt/microsoft/omsagent/bin/purge_omsagent.sh;                                  tools/purge_omsagent.sh;                                                        644; root; root
+
 %Links
 /opt/microsoft/omsagent/bin/omsagent; /opt/microsoft/omsagent/ruby/bin/fluentd; 755; root; root
 

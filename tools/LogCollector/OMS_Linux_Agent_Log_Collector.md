@@ -12,7 +12,7 @@ You can use OMS Log collector to collect logs for both failed and successful ins
 ## Log Collector Download:
 - Download the tool and copy to any directory of your choice:
     ```
-    wget https://github.com/Microsoft/OMS-Agent-for-Linux/raw/master/tools/LogCollector/download/v5/omslinux_agentlog.tgz
+    wget https://github.com/Microsoft/OMS-Agent-for-Linux/raw/master/tools/LogCollector/download/v6/omslinux_agentlog.tgz
     ```
     Recommendation is to copy the tool to the user’s home directory (/home/user)
 - Untar the archive file to extract OMS Log Collector source files:

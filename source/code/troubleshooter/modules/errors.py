@@ -54,7 +54,9 @@ error_messages = {
     ERR_RSA_KEY : "RSA key is invalid, please check {0} for the issue.",
     ERR_FILE_EMPTY : "File {0} is empty.",
     ERR_INFO_MISSING : "Couldn't get {0}. Please check {1} for the issue.",
-    ERR_ENDPT : "Machine couldn't connect to {0}: {1}",
+    ERR_ENDPT : "Machine couldn't connect to {0}: openssl command failed. "\
+          "Please run the command below for more information on the failure:\n"\
+          "\n  $ {1}\n",
     ERR_GUID : "The agent is configured to report to a different workspace - the GUID "\
           "given is {0}, while the workspace is {1}.",
     ERR_OMS_WONT_RUN : "The agent isn't running / will not start. {0}",
@@ -70,7 +72,9 @@ error_messages = {
     ERR_HEARTBEAT : "Heartbeats are failing to send data to the workspace.",
     ERR_MULTIHOMING : "Machine registered with more than one log analytics workspace. List of "\
           "workspaces: {0}",
-    ERR_INTERNET : "Machine is not connected to the internet.",
+    ERR_INTERNET : "Machine is not connected to the internet: openssl command failed. "\
+          "Please run the command below for more information on the failure:\n"\
+          "\n  $ {0}\n",
     ERR_QUERIES : "The following queries failed: {0}.",
     ERR_SYSLOG_WKSPC : "Syslog collection is set up for workspace {0}, but OMS is set up with "\
           "workspace {1}. Please see {2} for the issue.",

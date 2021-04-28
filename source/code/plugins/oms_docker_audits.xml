@@ -330,7 +330,7 @@
       impact="`docker.service` file contains sensitive parameters that may alter the behavior of Docker daemon. Hence, it should not be writable by any other user other than `root` to maintain the integrity of the file."
       remediation="**Step 1**: Find out the file location: ``` systemctl show -p FragmentPath docker.service ``` **Step 2**: If the file does not exist, this recommendation is not applicable. If the file exists, execute the below command with the correct file path to set the file permissions to `644`. For example, ``` chmod 644 /usr/lib/systemd/system/docker.service ```"
       ruleId="0c3fe131-c050-463a-a18f-672b5fbff86f">
-      <check distro="*" command="CheckUnitFileStats" path="docker.service" mode-mask="644" allow-stricter="true">
+      <check distro="*" command="CheckUnitFileStats" path="docker.service" mode="644" allow-stricter="true">
       <dependency type="SystemDUnitExists">docker.service</dependency>
       </check>
     </audit>
@@ -354,7 +354,7 @@
       impact="`docker.socket` file contains sensitive parameters that may alter the behavior of Docker daemon. Hence, it should not be writable by any other user other than `root` to maintain the integrity of the file."
       remediation="**Step 1**: Find out the file location: ``` systemctl show -p FragmentPath docker.socket ``` **Step 2**: If the file does not exist, this recommendation is not applicable. If the file exists, execute the below command with the correct file path to set the file permissions to `644`. For example, ``` chmod 644 /usr/lib/systemd/system/docker.service ```"
       ruleId="d57a531b-2853-4543-bcc8-bb1d241c4493">
-      <check distro="*" command="CheckUnitFileStats" path="docker.socket" mode-mask="644" allow-stricter="true">
+      <check distro="*" command="CheckUnitFileStats" path="docker.socket" mode="644" allow-stricter="true">
       <dependency type="SystemDUnitExists">docker.service</dependency>
       </check>
     </audit>
@@ -376,7 +376,7 @@
       impact="`/etc/docker` directory contains certificates and keys in addition to various sensitive files. Hence, it should only be writable by `root` to maintain the integrity of the directory."
       remediation="``` chmod 755 /etc/docker ``` This would set the permissions for the directory to `755`."
       ruleId="7f7df0f7-6968-4173-9c11-da000b10b52d">
-      <check distro="*" command="CheckFileStats" path="/etc/docker" mode-mask="755" allow-stricter="true"/>
+      <check distro="*" command="CheckFileStats" path="/etc/docker" mode="755" allow-stricter="true"/>
     </audit>
     <audit
       description="Ensure that registry certificate file ownership is set to root:root"
@@ -396,7 +396,7 @@
       impact="`/etc/docker/certs.d/` directory contains Docker registry certificates. These certificate files must have permissions of `444` to maintain the integrity of the certificates."
       remediation="``` chmod 444 /etc/docker/certs.d//* ``` This would set the permissions for registry certificate files to `444`."
       ruleId="a975323b-2b8c-4642-a666-df3a94fffcc6">
-      <check distro="*" command="CheckDirStats" path="/etc/docker/certs.d/" mode-mask="7444" allow-stricter="true"/>
+      <check distro="*" command="CheckDirStats" path="/etc/docker/certs.d/" mode="444" allow-stricter="true"/>
     </audit>
     <audit
       description="Ensure that TLS CA certificate file ownership is set to root:root"
@@ -416,7 +416,7 @@
       impact="The TLS CA certificate file should be protected from any tampering. It is used to authenticate Docker server based on given CA certificate. Hence, it must have permissions of `444` to maintain the integrity of the CA certificate."
       remediation="``` chmod 444 ``` This would set the file permissions of the TLS CA file to `444`."
       ruleId="75fb9d46-1350-4468-b8a0-4ac5643dcbea">
-      <check distro="*" command="CheckDockerTLSFileStats" key="tlscacert" mode-mask="444" allow-stricter="true"/>
+      <check distro="*" command="CheckDockerTLSFileStats" key="tlscacert" mode="444" allow-stricter="true"/>
     </audit>
     <audit
       description="Ensure that Docker server certificate file ownership is set to root:root"
@@ -436,7 +436,7 @@
       impact="The Docker server certificate file should be protected from any tampering. It is used to authenticate Docker server based on the given server certificate. Hence, it must have permissions of `444` to maintain the integrity of the certificate."
       remediation="``` chmod 444  ``` This would set the file permissions of the Docker server file to `444`."
       ruleId="a938bf93-7b14-4d9a-b98b-27f4eedf48c7">
-      <check distro="*" command="CheckDockerTLSFileStats" key="tlscert" mode-mask="444" allow-stricter="true"/>
+      <check distro="*" command="CheckDockerTLSFileStats" key="tlscert" mode="444" allow-stricter="true"/>
     </audit>
     <audit
       description="Ensure that Docker server certificate key file ownership is set to root:root"
@@ -456,7 +456,7 @@
       impact="The Docker server certificate key file should be protected from any tampering or unneeded reads. It holds the private key for the Docker server certificate. Hence, it must have permissions of `400` to maintain the integrity of the Docker server certificate."
       remediation="``` chmod 400  ``` This would set the Docker server certificate key file permissions to `400`."
       ruleId="d8b23920-3a4d-4cf2-b089-4360514d1396">
-      <check distro="*" command="CheckDockerTLSFileStats" key="tlskey" mode-mask="400" allow-stricter="true"/>
+      <check distro="*" command="CheckDockerTLSFileStats" key="tlskey" mode="400" allow-stricter="true"/>
     </audit>
     <audit
       description="Ensure that Docker socket file ownership is set to root:docker"
@@ -476,7 +476,7 @@
       impact="Only `root` and members of `docker` group should be allowed to read and write to default Docker Unix socket. Hence, the Docket socket file must have permissions of `660` or more restrictive."
       remediation="``` chmod 660 /var/run/docker.sock ``` This would set the file permissions of the Docker socket file to `660`."
       ruleId="34786628-0012-4b84-bf21-cc1f70dac193">
-      <check distro="*" command="CheckFileStats" path="/var/run/docker.sock" mode-mask="660" allow-stricter="true"/>
+      <check distro="*" command="CheckFileStats" path="/var/run/docker.sock" mode="660" allow-stricter="true"/>
     </audit>
     <audit
       description="Ensure that daemon.json file ownership is set to root:root"
@@ -496,7 +496,7 @@
       impact="`daemon.json` file contains sensitive parameters that may alter the behavior of docker daemon. Hence, it should be writable only by `root` to maintain the integrity of the file."
       remediation="``` chmod 644 /etc/docker/daemon.json ``` This would set the file permissions for this file to `644`."
       ruleId="6ef251ae-cfa2-4237-af7f-d938b159c98b">
-      <check distro="*" command="CheckFileStatsIfExists" path="/etc/docker/daemon.json" mode-mask="644" allow-stricter="true" key="FAIL"/>
+      <check distro="*" command="CheckFileStatsIfExists" path="/etc/docker/daemon.json" mode="644" allow-stricter="true" key="FAIL"/>
     </audit>
     <audit
       description="Ensure that /etc/default/docker file ownership is set to root:root"
@@ -518,7 +518,7 @@
       impact="`/etc/default/docker` file contains sensitive parameters that may alter the behavior of docker daemon. Hence, it should be writable only by `root` to maintain the integrity of the file."
       remediation="``` chmod 644 /etc/default/docker ``` This would set the file permissions for this file to `644`."
       ruleId="bf66d138-2b47-4dd9-8629-125aae091e25">
-      <check distro="*" command="CheckFileStats" path="/etc/default/docker" mode-mask="644" allow-stricter="true">
+      <check distro="*" command="CheckFileStats" path="/etc/default/docker" mode="644" allow-stricter="true">
         <dependency type="FileExists">/etc/default/docker</dependency>
       </check>
     </audit>

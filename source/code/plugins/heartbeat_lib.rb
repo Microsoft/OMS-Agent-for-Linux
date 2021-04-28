@@ -39,6 +39,8 @@ module HeartbeatModule
       record["Category"] = "Agent"
       record["SCAgentChannel"] = "Direct"
 
+      record["ComputerPrivateIps"] = OMS::Common.get_private_ips
+
       installed_date = OMS::Common.get_installed_date(agent_install_conf_file_path)
       record["InstalledDate"] = installed_date unless installed_date.nil?
       agent_version = OMS::Common.get_agent_version(agent_install_conf_file_path)

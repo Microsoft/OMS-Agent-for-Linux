@@ -36,9 +36,11 @@ BIN_PATH="/opt/microsoft/omsagent/bin/"
 TST_EXTRACT_DIR="`pwd -P`/tst_omsbundle.$$"
 TST_PATH="${BIN_PATH}/troubleshooter"
 TST_MODULES_PATH="/opt/microsoft/omsagent/tst"
+PURGE_SCRIPT_PATH="${BIN_PATH}/purge_omsagent.sh"
 
 TST_PKG="https://raw.github.com/microsoft/OMS-Agent-for-Linux/master/source/code/troubleshooter/omsagent_tst.tar.gz"
 TST_DOCS="https://github.com/microsoft/OMS-Agent-for-Linux/blob/master/docs/Troubleshooting-Tool.md"
+PURGE_SCRIPT_PKG="https://raw.github.com/microsoft/OMS-Agent-for-Linux/master/tools/purge_omsagent.sh"
 
 # These symbols will get replaced during the bundle creation process.
 
@@ -129,6 +131,8 @@ cleanup_and_exit()
     if [ ! -z "$INSTALL_TST" ]; then
         set +e
         install_troubleshooter
+        # download purge script as well
+        install_purge_script
         set -e
     fi
 
@@ -465,6 +469,25 @@ install_troubleshooter()
     echo "  $ sudo /opt/microsoft/omsagent/bin/troubleshooter"
     echo ""
         
+    return 0
+}
+
+install_purge_script()
+{
+    # check if purge script is already installed
+    if [ ! -f "$PURGE_SCRIPT_PATH" ]; then
+        echo "Purge script not installed using shell bundle, will try to install using wget."
+        mkdir -p $BIN_PATH
+        wget -P $BIN_PATH $PURGE_SCRIPT_PKG > /dev/null 2>&1
+        if [ $? -ne 0 ]; then
+            echo "Error downloading purge script. Please download it manually from the following location:"
+            echo ""
+            echo $PURGE_SCRIPT_PKG
+            echo ""
+            return 0
+        fi
+    fi
+
     return 0
 }
 

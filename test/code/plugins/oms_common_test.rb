@@ -221,6 +221,19 @@ module OMS
       assert(fqdn.size > 0, "Fqdn returned is empty")
     end
 
+    def test_get_private_ips
+        $log = MockLog.new
+        serialized_private_ips = Common.get_private_ips
+        assert($log.logs.empty?, "There was an error getting private ip(s)")
+        assert_not_equal(nil, serialized_private_ips, "Should never receive nil from get_private_ips")
+
+        begin
+            private_ips = JSON.parse(serialized_private_ips)
+        rescue => e
+            assert(false, "Failed to deserialize private IP array: #{e}")
+        end
+    end
+
     @@InstallConf = "1.1.0-124 20160412 Release_Build\n" \
       "2016-05-24T00:27:55.0Z\n" 
 

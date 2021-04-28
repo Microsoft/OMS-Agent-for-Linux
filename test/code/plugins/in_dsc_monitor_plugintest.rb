@@ -81,12 +81,11 @@ OMS Settings failed – please report issue to github.com/Microsoft/PowerShell-D
 
   def test_dsc_check_success_emits_no_messages
     result =
-	"instance of TestConfiguration
-	{
-	ReturnValue=0
-	InDesiredState=true
-	ResourceId={}
-	}"
+      'Operation TestConfiguration completed successfully.
+      {
+      "InDesiredState": true,
+      "ResourceId": []
+      }'
 
     flexmock(Fluent::DscMonitoringInput).new_instances do |instance|
       instance.should_receive(:`).with(CHECK_IF_DPKG).and_return(0)

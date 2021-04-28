@@ -17,7 +17,7 @@ The Log Analytics agent for Linux comprises multiple packages. The release file 
 
 **Package** | **Version** | **Description**
 ----------- | ----------- | --------------
-omsagent | 1.13.33 | The Operations Management Suite Agent for Linux
+omsagent | 1.13.35 | The Operations Management Suite Agent for Linux
 omsconfig | 1.1.1 | Configuration agent for the OMS Agent
 omi | 1.6.4 | Open Management Infrastructure (OMI) -- a lightweight CIM Server. *Note that OMI requires root access to run a cron job necessary for the functioning of the service*
 scx | 1.6.4 | OMI CIM Providers for operating system performance metrics

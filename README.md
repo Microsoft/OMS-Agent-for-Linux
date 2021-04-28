@@ -31,7 +31,7 @@ If you are an Azure customer, we have an Azure VM extension that allows you to e
 
 ## [Full installation guide](https://docs.microsoft.com/azure/azure-monitor/platform/log-analytics-agent)
 
-## [Download Latest OMS Agent for Linux (64-bit)](https://github.com/microsoft/OMS-Agent-for-Linux/releases/download/OMSAgent_v1.13.33-0/omsagent-1.13.33-0.universal.x64.sh)
+## [Download Latest OMS Agent for Linux (64-bit)](https://github.com/microsoft/OMS-Agent-for-Linux/releases/download/OMSAgent_v1.13.35-0/omsagent-1.13.35-0.universal.x64.sh)
 
 ## [Download Latest OMS Agent for Linux (Final 32-bit Release)](https://github.com/microsoft/OMS-Agent-for-Linux/releases/download/OMSAgent_v1.12.15-0/omsagent-1.12.15-0.universal.x86.sh)
 
@@ -57,7 +57,7 @@ The Log Analytics agent for Linux is built to work with Azure Monitor logs, whic
 
 If you are using a distro or version that is not currently supported and doesn't fit our future support strategy, we recommend that you fork this repo, acknowledging that Microsoft support will not provide assistance with for forked agent versions.
 
-### Pre-1.13.27 [Python Requrements](https://docs.microsoft.com/en-us/azure/azure-monitor/platform/agent-linux#python-2-requirement)
+### Pre-1.13.27 [Python Requirements](https://docs.microsoft.com/en-us/azure/azure-monitor/platform/agent-linux#python-2-requirement)
 
 ### 64-bit
 * CentOS 6, 7, and 8

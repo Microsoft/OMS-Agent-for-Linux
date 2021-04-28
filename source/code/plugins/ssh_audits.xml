@@ -1,0 +1,279 @@
+<baseline BaselineId="SSH.Linux.1" BaseOrigId="1">
+	<audits>
+    <audit
+      description="Ensure permissions on /etc/ssh/sshd_config are configured."
+      msid="5.2.1"
+      impact="The `/etc/ssh/sshd_config` file needs to be protected from unauthorized changes by non-privileged users."
+      remediation="Set the owner and group of /etc/ssh/sshd_config to root and set the permissions to 0600  or run '/opt/microsoft/omsagent/plugin/omsremediate -r sshd-config-file-permissions'"
+      ruleId="43119747-263c-2c92-4ce5-726e63259049">
+      <check 
+        distro="*" 
+        command="CheckFileStatsIfExists" 
+        path="/etc/ssh/sshd_config" 
+        owner="root" 
+        group="root" 
+        mode="600" 
+        allow-stricter="true"/>
+    </audit> 
+    <audit
+      description="SSH must be configured and managed to meet best practices. - '/etc/ssh/sshd_config Protocol = 2'"
+      msid="106.1"
+      cceid="CCE-4325-7"
+      severity="Critical"
+      impact="An attacker could use flaws in an earlier version of the SSH protocol to gain access"
+      remediation="Run the command '/opt/microsoft/omsagent/plugin/omsremediate -r configure-ssh-protocol'. This will set 'Protocol 2' in the file '/etc/ssh/sshd_config'"
+      ruleId="35868e8c-97eb-4981-ab79-99b25101cc86">
+      <check
+        distro="*"
+        command="CheckNoMatchingConfigValue"
+        regex="(?i)^protocol[[:space:]]+[1]$"
+        exec-command="sshcheck" />
+    </audit>
+    <audit
+        description="SSH must be configured and managed to meet best practices. - '/etc/ssh/sshd_config IgnoreRhosts = yes'"
+        msid="106.3"
+        cceid="CCE-4030-3"
+        severity="Critical"
+        impact="An attacker could use flaws in the Rhosts protocol to gain access"
+        remediation="Run the command '/usr/local/bin/azsecd remediate (/opt/microsoft/omsagent/plugin/omsremediate) -r enable-ssh-ignore-rhosts'. This will add the line 'IgnoreRhosts yes' to the file '/etc/ssh/sshd_config'"
+        ruleId="43945588-1bdc-495c-bac8-6a71a62d30aa">
+        <check
+          distro="*"
+          command="CheckMatchingConfigValue"
+          regex="(?i)^ignorerhosts[[:space:]]+yes$"
+          exec-command="sshcheck" />
+    </audit>
+    <audit
+        description="Ensure SSH LogLevel is set to INFO"
+        msid="106.5"
+        severity="Warning"
+        impact="SSH provides several logging levels with varying amounts of verbosity. `DEBUG `is specifically _not_ recommended other than strictly for debugging SSH communications since it provides so much data that it is difficult to identify important security information. `INFO `level is the basic level that only records login activity of SSH users. In many situations, such as Incident Response, it is important to determine when a particular user was active on a system. The logout record can eliminate those users who disconnected, which helps narrow the field."
+        remediation="Edit the `/etc/ssh/sshd_config` file to set the parameter as follows:
+        ```
+        LogLevel INFO
+        ```"
+        ruleId="31f1a912-1b98-42fd-8381-1e8d1033bfd1">
+        <check 
+          distro="*" 
+          command="CheckMatchingConfigValue"
+          regex="(?i)^loglevel[[:space:]]+info$"
+          exec-command="sshcheck" />
+    </audit>
+    <audit
+        description="Ensure SSH MaxAuthTries is set to 6 or less"
+        msid="106.7"
+        severity="Critical"
+        impact="Setting the `MaxAuthTries `parameter to a low number will minimize the risk of successful brute force attacks to the SSH server. While the recommended setting is 4, set the number based on site policy."
+        remediation="Ensure SSH MaxAuthTries is set to 6 or less
+        Edit the `/etc/ssh/sshd_config` file to set the parameter as follows:
+        ```
+        MaxAuthTries 6
+        ```"
+        ruleId="e7708534-5d98-406f-83ae-1de835b2906e">
+        <check 
+          distro="*" 
+          command="CheckMatchingConfigValue"
+          regex="(?i)^maxauthtries[[:space:]]+[0-6]$"
+          exec-command="sshcheck" />>
+    </audit>
+    <audit
+      description="Ensure SSH Idle Timeout Interval is configured."
+      msid="110.1"
+      impact="Having no timeout value associated with a connection could allow an unauthorized user access to another user's ssh session. Setting a timeout value at least reduces the risk of this happening. While the recommended setting is 300 seconds (5 minutes), set this timeout value based on site policy. The recommended setting for `ClientAliveCountMax` is 0. In this case, the client session will be terminated after 5 minutes of idle time and no keepalive messages will be sent."
+      remediation="Edit the /etc/ssh/sshd_config file to set the parameters according to the policy"
+      ruleId="fd9f1554-6b72-8610-826e-78578e6f7811">
+      <check 
+        distro="*" 
+        command="CheckMatchingConfigValue"
+        regex="(?i)^clientaliveinterval[[:space:]]+([1-9][0-9]*)$"
+        exec-command="sshcheck"/>
+      <check 
+        distro="*" 
+        command="CheckMatchingConfigValue" 
+        regex="(?i)^clientalivecountmax[[:space:]]+(0|1)$"
+        exec-command="sshcheck" />
+    </audit>
+    <audit
+      description="Ensure SSH LoginGraceTime is set to one minute or less."
+      msid="110.2"
+      impact="Setting the `LoginGraceTime` parameter to a low number will minimize the risk of successful brute force attacks to the SSH server. It will also limit the number of concurrent unauthenticated connections While the recommended setting is 60 seconds (1 Minute), set the number based on site policy."
+      remediation="Edit the /etc/ssh/sshd_config file to set the parameters according to the policy  or run '/opt/microsoft/omsagent/plugin/omsremediate -r configure-login-grace-time'"
+      ruleId="39aa5c2b-5b36-84a7-4022-570a53c86ff9">
+      <check 
+        distro="*" 
+        command="CheckMatchingConfigValue"
+        regex="(?i)^logingracetime[[:space:]]+(60|[0-5][0-9])$"
+        exec-command="sshcheck" />
+    </audit>
+    <audit
+      description="Ensure only approved MAC algorithms are used"
+      msid="110.3"
+      impact="MD5 and 96-bit MAC algorithms are considered weak and have been shown to increase exploitability in SSH downgrade attacks. Weak algorithms continue to have a great deal of attention as a weak spot that can be exploited with expanded computing power. An attacker that breaks the algorithm could take advantage of a MiTM position to decrypt the SSH tunnel and capture credentials and information"
+      remediation="Edit the /etc/sshd_config file and add/modify the MACs line to contain a comma separated list of the approved MACs  or run '/opt/microsoft/omsagent/plugin/omsremediate -r configure-macs'"
+      ruleId="483e8b0c-7572-8467-7e0c-26e1e9ce6359">
+      <check
+        distro="*"
+        command="CheckMatchingConfigValue"
+        regex="(?i)^macs[[:space:]]+((\bhmac-sha2-512-etm@openssh.com\b|\bhmac-sha2-256-etm@openssh.com\b|\bhmac-sha2-512\b|\bhmac-sha2-256\b)(?:,?))+?$"
+        exec-command="sshcheck"/>
+    </audit>
+    <audit
+        description="Ensure SSH access is limited"
+        msid="106.11"
+        severity="Critical"
+        impact="Restricting which users can remotely access the system via SSH will help ensure that only authorized users access the system."
+        remediation="Ensure SSH access is limited
+
+        Edit the `/etc/ssh/sshd_config` file to set one or more of the parameter as follows:
+        ```
+        AllowUsers 
+        AllowGroups 
+        DenyUsers 
+        DenyGroups 
+        ```"
+        ruleId="dc8da71d-aeba-4c03-8835-36fe158e372a">
+        <check 
+          distro="*" 
+          command="CheckMatchingConfigValue"
+          regex="(?i)^(allowusers|allowgroups|denyusers|denygroups)[[:space:]]+[[:ascii:]]"
+          exec-command="sshcheck" />
+    </audit>
+    <audit
+      description="Emulation of the rsh command through the ssh server should be disabled. - '/etc/ssh/sshd_config RhostsRSAAuthentication = no'"
+      msid="107"
+      cceid="CCE-4475-0"
+      severity="Critical"
+      impact="An attacker could use flaws in the RHosts protocol to gain access"
+      remediation="Run the command '/opt/microsoft/omsagent/plugin/omsremediate -r disable-ssh-rhost-rsa-auth'. This will add the line 'RhostsRSAAuthentication no' to the file '/etc/ssh/sshd_config'"
+      ruleId="c0b75409-01e3-4428-9a32-bfcdb42afcb5">
+      <check
+        distro="and|!Ubuntu>=18.04|!RedHat>=7|!Debian>=9|!Oracle>=7|!CentOS>=7"
+        command="CheckNoMatchingConfigValue"
+        regex="(?i)^rhostsrsaauthentication[[:space:]]+yes$"
+        exec-command="sshcheck" />
+    </audit>
+    <audit
+        description="SSH host-based authentication should be disabled. - '/etc/ssh/sshd_config HostbasedAuthentication = no'"
+        msid="108"
+        cceid="CCE-4370-3"
+        severity="Critical"
+        impact="An attacker could use use host-based authentication to gain access from a compromised host"
+        remediation="Run the command '/opt/microsoft/omsagent/plugin/omsremediate -r disable-ssh-host-based-auth'. This will add the line 'HostbasedAuthentication no' to the file '/etc/ssh/sshd_config'"
+        ruleId="66511f6b-f690-43df-9654-642260699eec">
+        <check
+          distro="*"
+          command="CheckMatchingConfigValue"
+          regex="(?i)^hostbasedauthentication[[:space:]]+no$"
+          exec-command="sshcheck" />
+    </audit>
+    <audit
+        description = "Root login via SSH should be disabled. - '/etc/ssh/sshd_config PermitRootLogin = no'"
+        msid="109"
+        cceid="CCE-4387-7"
+        severity="Critical"
+        impact="An attacker could brute force the root password, or hide their command history by logging in directly as root"
+        remediation="Run the command '/usr/local/bin/azsecd remediate -r disable-ssh-root-login'. This will add the line 'PermitRootLogin no' to the file '/etc/ssh/sshd_config'"
+        ruleId="16511f6b-f690-43df-9654-642260699eec">
+        <check 
+          distro="*" 
+          command="CheckMatchingConfigValue"
+          regex="(?i)^permitrootlogin[[:space:]]+no$"
+          exec-command="sshcheck"/>
+    </audit>
+    <audit
+        description="Remote connections from accounts with empty passwords should be disabled. - '/etc/ssh/sshd_config PermitEmptyPasswords = no'"
+        msid="110"
+        cceid="CCE-3660-8"
+        severity="Critical"
+        impact="An attacker could gain access through password guessing"
+        remediation="Run the command '/usr/local/bin/azsecd remediate (/opt/microsoft/omsagent/plugin/omsremediate) -r disable-ssh-empty-passwords'. This will add the line 'PermitEmptyPasswords no' to the file '/etc/ssh/sshd_config'"
+        ruleId="d50c3f39-264c-4cdc-b0ba-89de8a0f6828">
+        <check
+          distro="*"
+          command="CheckMatchingConfigValue"
+          regex="(?i)^permitemptypasswords[[:space:]]+no$"
+          exec-command="sshcheck" />
+    </audit>
+    <audit
+        description = "SSH warning banner should be enabled. - '/etc/ssh/sshd_config Banner = /etc/issue.net'"
+        msid="111.2"
+        cceid="CCE-4431-3"
+        severity="Informational"
+        impact="Users will not be warned that their actions on the system are monitored"
+        remediation="Run the command '/usr/local/bin/azsecd remediate -r configure-ssh-banner'. This will add the line 'Banner /etc/azsec/banner.txt' to the file '/etc/ssh/sshd_config'"
+        ruleId="9e240540-5e0a-4b60-beb2-57421c65a0b9">
+        <check 
+          distro="*" 
+          command="CheckMatchingConfigValue"
+          regex="(?i)^banner[[:space:]]+[^none$]"
+          exec-command="sshcheck"/>
+    </audit>
+    <audit
+        description="Users are not allowed to set environment options for SSH."
+        msid="112"
+        cceid="CCE-14716-5"
+        severity="Warning"
+        impact="An attacker may be able to bypass some access restrictions over SSH"
+        remediation="Remove the line 'PermitUserEnvironment yes' from the file '/etc/ssh/sshd_config'"
+        ruleId="0e665978-91f4-45af-bb7b-e4090b600c8d">
+        <check
+          distro="*"
+          command="CheckMatchingConfigValue"
+          regex="(?i)^permituserenvironment[[:space:]]+no$"
+          exec-command="sshcheck" />
+    </audit>
+    <audit
+        description = "Appropriate ciphers should be used for SSH. (Ciphers aes128-ctr,aes192-ctr,aes256-ctr)"
+        msid="113"
+        cceid="CCE-14491-5"
+        severity="Critical"
+        impact="An attacker could compromise a weakly secured SSH connection"
+        remediation="Run the command '/usr/local/bin/azsecd remediate -r configure-ssh-ciphers'. This will add the line 'Ciphers aes128-ctr,aes192-ctr,aes256-ctr' to the file '/etc/ssh/sshd_config'"
+        ruleId="b07d4c69-a1d9-4c22-a486-634ec3b8c380">
+        <check 
+          distro="*" 
+          command="CheckMatchingConfigValue"
+          regex="(?i)^ciphers[[:space:]]+((\baes128-ctr\b|\baes256-ctr\b|\baes192-ctr\b)(?:,?))+?$"
+          exec-command="sshcheck"/>
+    </audit>
+  </audits>
+  <remediations>
+    <remediation id="configure-macs" msids="110.3" description="Configure SSH MACs">
+    <action distro="*" action="ActionEditConfig" name="MACs" value="hmac-sha2-512-etm@openssh.com,hmac-sha2-256-etm@openssh.com,hmac-sha2-512,hmac-sha2-256" value-regex="\S+" path="/etc/ssh/sshd_config"/>
+    </remediation>
+    <remediation id="configure-login-grace-time" msids="110.2" description="Configure SSH grace time">
+    <action distro="*" action="ActionEditConfig" name="LoginGraceTime" value="60" value-regex="[0-9]+" path="/etc/ssh/sshd_config"/>
+    </remediation>
+    <remediation id="sshd-config-file-permissions" msids="5.2.1" description="Set the permissions of /etc/ssh/sshd_config">
+      <action distro="*" action="ActionSetPerms" path="/etc/ssh/sshd_config" name="root:root" value="0600"/>
+    </remediation>
+    <remediation id="deny-users-ssh" msids="106.11" description="Deny SSH Login ability to root, omsagent, and nxautomation">
+      <action distro="*" action="ActionEditConfig" path="/etc/ssh/sshd_config" name="DenyUsers" value-regex="(\w+\s*)*" value="root omsagent nxautomation"/>
+    </remediation>
+    <remediation id="disable-ssh-rhost-rsa-auth" msids="107" description="Disable RhostsRSAAuthentication in ssh">
+      <action distro="and|!Ubuntu>=18.04|!RedHat>=7|!Debian>=9|!Oracle>=7|!CentOS>=7" action="ActionEditConfig" name="RhostsRSAAuthentication" value="no" value-regex="[a-z-]+" path="/etc/ssh/sshd_config"/>
+    </remediation>
+    <remediation id="enable-ssh-ignore-rhosts" msids="106.3" description="Enable IgnoreRhosts in ssh">
+      <action distro="*" action="ActionEditConfig" name="IgnoreRhosts" value="yes" value-regex="[a-z-]+" path="/etc/ssh/sshd_config"/>
+    </remediation>
+    <remediation id="disable-ssh-host-based-auth" msids="108" description="Disable HostbasedAuthentication in ssh">
+      <action distro="*" action="ActionEditConfig" name="HostbasedAuthentication" value="no" value-regex="[a-z-]+" path="/etc/ssh/sshd_config"/>
+    </remediation>
+    <remediation id="disable-ssh-root-login" msids="109" description="Disable SSH root login">
+      <action distro="*" action="ActionEditConfig" name="PermitRootLogin" value="no" value-regex="[a-z-]+" path="/etc/ssh/sshd_config"/>
+    </remediation>
+    <remediation id="disable-ssh-empty-passwords" msids="110" description="Disable SSH empty passwords">
+      <action distro="*" action="ActionEditConfig" name="PermitEmptyPasswords" value="no" value-regex="[a-z-]+" path="/etc/ssh/sshd_config"/>
+    </remediation>
+    <remediation id="configure-ssh-banner" msids="111" description="Configure ssh banner">
+      <action distro="*" action="ActionEditConfig" name="Banner" value="/etc/azsec/banner.txt" value-regex="\S+" path="/etc/ssh/sshd_config"/>
+    </remediation>
+    <remediation id="configure-ssh-ciphers" msids="113" description="Configure ssh ciphers">
+      <action distro="*" action="ActionEditConfig" name="Ciphers" value="aes128-ctr,aes192-ctr,aes256-ctr" value-regex="[a-z\,-]+" path="/etc/ssh/sshd_config"/>
+    </remediation>
+    <remediation id="ssh-idle-imeout-interval" msids="110.1" description="Configure SSH Idle Timeout Interval">
+      <action distro="*" action="ActionEditConfig" name="ClientAliveCountMax" value="0" value-regex="[0-9]+" path="/etc/ssh/sshd_config"/>
+      <action distro="*" action="ActionEditConfig" name="ClientAliveInterval" value="300" value-regex="[0-9]+" path="/etc/ssh/sshd_config"/>
+    </remediation>
+  </remediations>
+</baseline>
