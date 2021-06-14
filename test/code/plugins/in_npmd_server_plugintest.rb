@@ -94,7 +94,6 @@ class NPMDServerTest < Test::Unit::TestCase
         _d.instance.omsagentUID = Process.euid
         _d.instance.do_capability_check = false
         _d.instance.dsc_resource_version = "TEST"
-        _d.instance.networkAgentState = nil
         _d
     end
 

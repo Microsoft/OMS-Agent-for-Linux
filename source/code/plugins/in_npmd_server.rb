@@ -100,7 +100,6 @@ module Fluent
         attr_accessor :do_capability_check
         attr_accessor :npmd_state_dir
         attr_accessor :dsc_resource_version
-        attr_accessor :networkAgentState
 
         def start
             # Fetch parameters related to instance
@@ -128,7 +127,6 @@ module Fluent
             @npmdIntendedStop = false
             @stderrFileNameHash = Hash.new
             @stop_sync = Mutex.new
-            @networkAgentState = nil
 
             # Parameters for restart backoffs
             @agent_restart_count = 0
@@ -300,10 +298,8 @@ module Fluent
                             _uploadData = _json["DataItems"].reject {|x| x["SubType"] == NPM_DIAG}
                             _diagLogs   = _json["DataItems"].select {|x| x["SubType"] == NPM_DIAG}
                             _validUploadDataItems = Array.new
-                            _batchTime = Time.now.utc.strftime("%Y-%m-%d %H:%M:%SZ")
                             _subtypeList = ["EndpointHealth", "EndpointPath", "ExpressRoutePath", "EndpointDiagnostics", "ConnectionMonitorTestResult", "ConnectionMonitorPath", "NetworkAgentDiagnostics"]
                             _uploadData.each do |item|
-                                item["TimeGenerated"] = _batchTime
                                 if item.key?("SubType")
                                     # Append FQDN to path data
                                     if !@fqdn.nil? and item["SubType"] == "NetworkPath"
@@ -312,14 +308,14 @@ module Fluent
                                     # Append agent Guid to agent data
                                     elsif !@agentId.nil? and item["SubType"] == "NetworkAgent"
                                         @num_agent_data += 1 unless @num_agent_data.nil?
-                                        if shouldUploadNetworkAgentInfo(item)
-                                            _validUploadDataItems << item if is_valid_dataitem(item)
-                                        else
-                                            Logger::logInfo "Network Agent data upload is skipped because it hasnt changed from the last time"
-                                        end
+                                        _validUploadDataItems << item if is_valid_dataitem(item)
                                     # Append EPM, CM and ER data
                                     elsif _subtypeList.include?item["SubType"]
                                         Logger::logInfo "#{item["SubType"]} is uploaded"
+                                        #Append UploadDirectly Flag to true for ConnectionMonitorPath as this flag will be used at NPM service
+                                        if item["SubType"] == "ConnectionMonitorPath"
+                                            item["UploadDirectly"] = "true"
+                                        end
                                         _validUploadDataItems << item if is_valid_dataitem(item)
                                     else
                                         log_error "Invalid Subtype data received"
@@ -400,44 +396,6 @@ module Fluent
                 _record["DataItems"] = _dataitem
                 router.emit(@tag, Engine.now, _record)
             end
-        end
-
-        def shouldUploadNetworkAgentInfo(item)
-            _retVal = false
-            if(@networkAgentState == nil ||
-                @networkAgentState["SubnetId"] == nil ||
-                @networkAgentState["AgentIP"] == nil ||
-                @networkAgentState["AgentFqdn"] == nil ||
-                @networkAgentState["TimeGenerated"] == nil
-                ) 
-                _retVal = true
-            end
-            _timeDiff = 0
-            if(@networkAgentState != nil &&
-                @networkAgentState["TimeGenerated"] != nil &&
-                item["TimeGenerated"] != nil
-                )
-                _timeDiff = Time.parse(item["TimeGenerated"]) - Time.parse(@networkAgentState["TimeGenerated"])
-                _timeDiff /= 3600
-            end
-            if(!_retVal &&
-                _timeDiff > 6 ||
-                _timeDiff < 0
-                )
-                _retVal = true
-            end
-            if(!_retVal &&
-                (@networkAgentState["SubnetId"] != item["SubnetId"] ||
-                    @networkAgentState["AgentIP"] != item["AgentIP"] ||
-                    @networkAgentState["AgentFqdn"] != item["AgentFqdn"]
-                    )
-                )
-                _retVal = true
-            end
-            if(_retVal)
-                @networkAgentState = item
-            end
-            return _retVal
         end
 
         def emit_diag_log_dataitems_of_agent(dataitems)
@@ -677,11 +635,15 @@ module Fluent
                 unless is_npmd_seen_in_ps()
                     @npmdIntendedStop = false
                     _stderrFileName = "#{File.dirname(@location_unix_endpoint)}/stderror_#{SecureRandom.uuid}.log"
-                    @npmdProcessId = Process.spawn(@binary_invocation_cmd, :err=>_stderrFileName)
-                    @last_npmd_start = Time.now
-                    @stderrFileNameHash[@npmdProcessId] = _stderrFileName
-                    _t = Thread.new {handle_exit(@npmdProcessId)}
-                    Logger::logInfo "NPMD Agent running with process id #{@npmdProcessId}"
+                    begin
+                        @npmdProcessId = Process.spawn(@binary_invocation_cmd, :err=>_stderrFileName)
+                        @last_npmd_start = Time.now
+                        @stderrFileNameHash[@npmdProcessId] = _stderrFileName
+                        _t = Thread.new {handle_exit(@npmdProcessId)}
+                        Logger::logInfo "NPMD Agent running with process id #{@npmdProcessId}"
+                    rescue
+                        log_error "Unable to spawn NPMD Agent binary"
+                    end
                 else
                     Logger::logInfo "Npmd already seen in PS"
                 end
