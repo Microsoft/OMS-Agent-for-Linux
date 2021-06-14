@@ -1,14 +1,14 @@
 module Fluent
 
-  class OutputOMSBlob < BufferedOutput
+  class OutputOMSBlob < ObjectBufferedOutput
 
     Plugin.register_output('out_oms_blob', self)
-	
+  
     # Endpoint URL ex. localhost.local/api/
 
     def initialize
       super
-	  
+    
       require 'base64'
       require 'digest'
       require 'json'
@@ -33,6 +33,8 @@ module Fluent
     config_param :url_suffix_template, :string, :default => "custom_data_type + '/00000000-0000-0000-0000-000000000002/' + OMS::Common.get_hostname + '/' + OMS::Configuration.agent_id + '/' + suffix + '.log'"
     config_param :proxy_conf_path, :string, :default => '/etc/opt/microsoft/omsagent/proxy.conf'
     config_param :run_in_background, :bool, :default => false
+
+    @@ChunkUploadByTagSyncMutex = {}
 
     def configure(conf)
       super
@@ -133,14 +135,20 @@ module Fluent
       extra_headers = {
         OMS::CaseSensitiveString.new('x-ms-client-request-retry-count') => "#{@num_errors}"
       }
+
       req = OMS::Common.create_ods_request(OMS::Configuration.get_blob_ods_endpoint.path, data, compress=false, extra_headers)
+
+      requestId = req.to_hash['X-Request-ID'].first
+
+      @log.trace("[#{Thread.current.object_id}] request_blob_json url=#{OMS::Configuration.get_blob_ods_endpoint.path}, requestId=#{requestId}")
 
       ods_http = OMS::Common.create_ods_http(OMS::Configuration.get_blob_ods_endpoint, @proxy_config)
       body = OMS::Common.start_request(req, ods_http)
 
+
       # remove the BOM (Byte Order Marker)
       clean_body = body.encode(Encoding::UTF_8, :invalid => :replace, :undef => :replace, :replace => "")
-      return JSON.parse(clean_body)
+      return JSON.parse(clean_body), requestId
     end # request_blob_json
 
     # get the blob SAS URI and committed blocks from ODS
@@ -153,7 +161,7 @@ module Fluent
     #   URI. blob SAS URI
     #   string[]. a list of committed blocks
     def get_blob_uri_and_committed_blocks(container_type, data_type, custom_data_type, suffix)
-      blob_json = request_blob_json(container_type, data_type, custom_data_type, suffix)
+      blob_json, requestId = request_blob_json(container_type, data_type, custom_data_type, suffix)
 
       if blob_json.has_key?("Uri")
         blob_uri = URI.parse(blob_json["Uri"])
@@ -172,7 +180,7 @@ module Fluent
         blob_size = 0
       end
 
-      return blob_uri, blocks_committed, blob_size
+      return blob_uri, blocks_committed, blob_size, requestId
     end # get_blob_uri_and_committed_blocks
 
     # append data to the blob
@@ -180,36 +188,36 @@ module Fluent
     #   uri: URI. blob URI
     #   msgs: string[]. messages
     #   file_path: string. file path
-    def append_blob(uri, msgs, file_path, blocks_committed)
-      if msgs.size == 0
-        return 0
-      end
+    def append_blob(uri, chunk, file_path, blocks_committed)
 
       # concatenate the messages
-      msg = ''
-      msgs.each { |s| msg << "#{s}\r\n" if s.to_s.length > 0 }
-      dataSize = msg.length
+      data = ''
+      count = 0
+      chunk.msgpack_each {|(timestamp, record)|
+        if record['message'].length > 0
+          data << "#{record['message']}\r\n"
+          count += 1
+        end
+      }
 
-      if dataSize == 0
-        return 0
-      end
+      return 0 if data.length == 0
 
       # append blocks
       # if the msg is longer than 100MB (to be safe, blob limitation is 100MB), we should break it into multiple blocks
-      chunk_size = 100000000
+      chunk_size_upload_limit = 100000000
       blocks_uncommitted = []
-      if msg.to_s.length <= chunk_size
-        blocks_uncommitted << upload_block(uri, msg)
+      if data.length <= chunk_size_upload_limit
+        blocks_uncommitted << upload_block(uri, data)
       else
-        while msg.to_s.length > 0 do
-          chunk = msg.slice!(0, chunk_size)
-          blocks_uncommitted << upload_block(uri, chunk)
+        while data.length > 0 do
+          small_block = msg.slice!(0, chunk_size_upload_limit)
+          blocks_uncommitted << upload_block(uri, small_block)
         end
       end
 
       # commit blocks
       etag = commit_blocks(uri, blocks_committed, blocks_uncommitted, file_path)
-      return dataSize, etag
+      return data.length, count, etag
     end # append_blob
 
     # upload one block to the blob
@@ -296,9 +304,11 @@ module Fluent
       }
 
       req = OMS::Common.create_ods_request(OMS::Configuration.notify_blob_ods_endpoint.path, data, compress=false)
+      requestId = req.to_hash['X-Request-ID'].first
 
       ods_http = OMS::Common.create_ods_http(OMS::Configuration.notify_blob_ods_endpoint, @proxy_config)
       body = OMS::Common.start_request(req, ods_http)
+      return body, requestId
     end # notify_blob_upload_complete
     
     def write_status_file(success, message)
@@ -315,7 +325,17 @@ module Fluent
     # parameters:
     #   tag: string. the tag of the item
     #   records: string[]. an arrary of data
-    def handle_record(tag, records)
+    def handle_record(tag, chunk)
+
+      BlockLock.lock
+      begin
+        if !@@ChunkUploadByTagSyncMutex.has_key?(tag)
+          @@ChunkUploadByTagSyncMutex[tag] = Mutex.new
+        end
+      ensure
+        BlockLock.unlock
+      end
+
       filePath = nil
 
       tags = tag.split('.')
@@ -348,34 +368,36 @@ module Fluent
         raise "The tag does not have at least 4 parts #{tag}"
       end
 
-      start = Time.now
-      blob_uri, blocks_committed, blob_size = get_blob_uri_and_committed_blocks(container_type, data_type, custom_data_type, suffix)
-      time = Time.now - start
-      @log.debug "Success getting the BLOB information in #{time.round(3)}s"
+      @log.trace "[#{Thread.current.object_id}] Thread trying to enter critical section with tag=#{tag}"
+      @@ChunkUploadByTagSyncMutex[tag].synchronize {
+        @log.trace "[#{Thread.current.object_id}] Entered critical section, tag=#{tag}"
+        # ODS: Getting BLOB URI & Committed blocks
+        start = Time.now
+        blob_uri, blocks_committed, blob_size = get_blob_uri_and_committed_blocks(container_type, data_type, custom_data_type, suffix)
+        time = Time.now - start
+        @log.debug "[#{Thread.current.object_id}] Success getting the BLOB information in #{time.round(3)}s blob_uri=#{blob_uri}"
 
-      start = Time.now
+        # Storage Account: Upload the new block
+        start = Time.now
+        dataSize, num_records, etag = append_blob(blob_uri, chunk, filePath, blocks_committed)
+        time = Time.now - start
+        @log.debug "[#{Thread.current.object_id}] Success sending #{tag} x #{num_records} in #{time.round(2)}s to BLOB, size #{dataSize/1000}KB, etag=#{etag}"
+        @log.trace "[#{Thread.current.object_id}] Finish append_blob()"
 
-      if @num_threads > 1
-        # get a lock for the blob append to avoid storage errors when parallel threads are writing
-        BlockLock.lock
-        begin
-          dataSize, etag = append_blob(blob_uri, records, filePath, blocks_committed)
-        ensure
-          BlockLock.unlock
-        end
-      else
-        dataSize, etag = append_blob(blob_uri, records, filePath, blocks_committed)
-      end
+        # ODS: Notify ODS of the new block
+        start = Time.now
+        response, requestId = notify_blob_upload_complete(blob_uri, data_type, custom_data_type, blob_size, dataSize, etag)
+        time = Time.now - start
+        @log.trace "[#{Thread.current.object_id}] Success notify the data to BLOB #{time.round(3)}s, requestId=#{requestId}, etag=#{etag}"
+        write_status_file("true","Sending success")
 
-      time = Time.now - start
-      @log.debug "Success sending #{dataSize} bytes of data to BLOB #{time.round(3)}s"
+        # @log.trace "[#{Thread.current.object_id}] Sleep and hold lock for 15 seconds to prevent sending many ODS notifications, tag=#{tag}, etag=#{etag}"
+        # sleep 15
+        # @log.trace "[#{Thread.current.object_id}] Done sleeping releasing lock, tag=#{tag}, etag=#{etag}"
+        @log.trace "[#{Thread.current.object_id}] Leaving critical section, tag=#{tag}"
 
-      start = Time.now
-      notify_blob_upload_complete(blob_uri, data_type, custom_data_type, blob_size, dataSize, etag)
-      time = Time.now - start
-      @log.trace "Success notify the data to BLOB #{time.round(3)}s"
-      write_status_file("true","Sending success")
-      return OMS::Telemetry.push_qos_event(OMS::SEND_BATCH, "true", "", tag, records, records.size, time)
+        return OMS::Telemetry.push_qos_event(OMS::SEND_BATCH, "true", "", tag, [], num_records, time)
+      }      
     rescue OMS::RetryRequestException => e
       @log.info "Encountered retryable exception. Will retry sending data later."
       @log.debug "Error:'#{e}'"
@@ -384,49 +406,26 @@ module Fluent
       # it must be generic exception, otherwise, fluentd will stuck.
       raise e.message
     rescue => e
-      msg = "Unexpected exception, dropping data. Error:'#{e}'"
+      msg = "Unexpected exception, dropping data. Error:'#{e}', backtrace: #{e.backtrace}"
       OMS::Log.error_once(msg)
       write_status_file("false","Unexpected exception")
       return msg
     end # handle_record
 
-    # This method is called when an event reaches to Fluentd.
-    # Convert the event to a raw string.
-    def format(tag, time, record)
-      [tag, record].to_msgpack
-    end
+    def write_objects(tag, chunk)
+      return if chunk.empty?
 
-    def self_write(chunk)
-      # Group records based on their datatype because OMS does not support a single request with multiple datatypes.
-      datatypes = {}
-      chunk.msgpack_each {|(tag, record)|
-        if !datatypes.has_key?(tag)
-          datatypes[tag] = []
-        end
-        datatypes[tag] << record['message']
-      }
-
-      ret = []
-      datatypes.each do |key, records|
-        ret << {'source': key, 'event': handle_record(key, records)}
-      end
-
-      ret
-    end
-
-    # This method is called every flush interval. Send the buffer chunk to OMS.
-    # 'chunk' is a buffer chunk that includes multiple formatted
-    # NOTE! This method is called by (out_oms_blob) plugin thread not Fluentd's main thread. So IO wait doesn't affect other plugins.
-    def write(chunk)
       # Quick exit if we are missing something
       if !OMS::Configuration.load_configuration(omsadmin_conf_path, cert_path, key_path)
         raise 'Missing configuration. Make sure to onboard. Will continue to buffer data.'
       end
 
       if run_in_background
-        OMS::BackgroundJobs.instance.run_job_and_wait { self_write(chunk) }
+        OMS::BackgroundJobs.instance.run_job_and_wait {
+          {'source': tag, 'event': handle_record(tag, chunk)}
+        }
       else
-        self_write(chunk)
+        handle_record(tag, chunk)
       end
     end
 
