@@ -323,7 +323,7 @@ module VMInsights
                     line = line.split(" ")
                     next if line.empty?
                     dev = line[0]
-                    next unless ((0...10).include? dev.length) && (dev.end_with? ":")
+                    next unless (dev.end_with? ":")
                     dev.chop!
                     next if Dir.exist? File.join(sys_devices_virtual_net, dev)
                     result[dev] = RawNetData.new(dev, now, devices_up[dev], line[1].to_i, line[9].to_i)
