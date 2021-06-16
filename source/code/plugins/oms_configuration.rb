@@ -307,13 +307,13 @@ module OMS
             @@AzureResourceId = ENV['customResourceId']
             
             # Only if environment variable is empty/nil load it from imds and refresh it periodically.
-            if @@AzureResourceId.nil? || @@AzureResourceId.empty?              
+            if @@AzureResourceId.nil? || @@AzureResourceId.empty?
               @@AzureResourceId = line.sub("AZURE_RESOURCE_ID=","").strip
               if @@AzureResourceId.include? "Microsoft.ContainerService"
-                OMS::Log.info_once("Azure resource id in configuration file is for AKS. It will be used")                  
+                OMS::Log.info_once("Azure resource id in configuration file is for AKS. It will be used")
               else
                 Thread.new(&method(:update_azure_resource_id)) if @@AzureResIDThreadLock.try_lock
-              end            
+              end
             else
               OMS::Log.info_once("There is non empty value set for overriden-resourceId environment variable. It will be used")
             end
@@ -337,7 +337,7 @@ module OMS
               @@UUID = uuid_str
             else
               @@UUID = "00000000-0000-0000-0000-000000000000" 
-            end          
+            end
           end
         end
 
@@ -366,6 +366,15 @@ module OMS
         @@TelemetryInterval = telemetry_interval
         OMS::Log.info_once("OMS agent management service topology request interval now #{@@TopologyInterval}")
         OMS::Log.info_once("OMS agent management service telemetry request interval now #{@@TelemetryInterval}")
+      end
+
+      # Check whether DSC has been disabled (which prevents automatic config management)
+      def is_dsc_disabled
+        begin
+          return File.exist?("/etc/opt/omi/conf/omsconfig/omshelper_disable")
+        rescue => e
+          OMS::Log.error_once("Failed to get DSC enabled/disabled status. #{e}")
+        end
       end
 
       def cert

@@ -71,6 +71,7 @@ module Fluent
         query_interval = OMS::Configuration.topology_interval
         @run_interval = query_interval if !query_interval.nil? and query_interval.between?(MIN_QUERY_INTERVAL, MAX_QUERY_INTERVAL)
       end
+      @maintenance_script.generate_dsc_metaconfig
     end
 
     def run_periodic

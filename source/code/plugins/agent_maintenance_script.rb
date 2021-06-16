@@ -1,4 +1,5 @@
 require 'optparse'
+require 'open3'
 
 module MaintenanceModule
 
@@ -40,6 +41,10 @@ module MaintenanceModule
       @URL_TLD = nil
       @LOG_FACILITY = nil
       @CERTIFICATE_UPDATE_ENDPOINT = nil
+
+      @current_DSC_ENDPOINT = nil
+      @pending_DSC_ENDPOINT = nil
+      @pending_metaconfig_generation = false
 
       @load_config_return_code = load_config
       @logger = log.nil? ? OMS::Common.get_logger(@LOG_FACILITY) : log
@@ -85,6 +90,11 @@ module MaintenanceModule
       @logger.info(message) if !@suppress_logging
     end
 
+    def log_warn(message)
+      print("warn\t#{message}\n") if !@suppress_logging and !@suppress_stdout
+      @logger.warn(message) if !@suppress_logging
+    end
+
     def log_error(message)
       print("error\t#{message}\n") if !@suppress_logging and !@suppress_stdout
       @logger.error(message) if !@suppress_logging
@@ -113,6 +123,8 @@ module MaintenanceModule
           @LOG_FACILITY = line.sub("LOG_FACILITY=","").strip
         elsif line =~ /^CERTIFICATE_UPDATE_ENDPOINT/
           @CERTIFICATE_UPDATE_ENDPOINT = line.sub("CERTIFICATE_UPDATE_ENDPOINT=","").strip
+        elsif line =~ /^DSC_ENDPOINT/
+          @current_DSC_ENDPOINT = line.sub("DSC_ENDPOINT=","").strip
         end
       end
 
@@ -122,6 +134,7 @@ module MaintenanceModule
     # Update omsadmin.conf with the specified variable's value
     def update_config(var, val)
       if !File.exist?(@omsadmin_conf_path)
+        log_error("Missing configuration file: #{@omsadmin_conf_path}")
         return OMS::MISSING_CONFIG_FILE
       end
 
@@ -131,6 +144,10 @@ module MaintenanceModule
       File.open(@omsadmin_conf_path, "w") { |file|
         file.puts(new_text)
       }
+
+      if old_text != new_text
+        log_info("omsadmin.conf updated with #{var}=#{val}")
+      end
     end
 
     # Updates the CERTIFICATE_UPDATE_ENDPOINT variable and renews certificate if requested
@@ -171,32 +188,105 @@ module MaintenanceModule
 
     # Update the DSC_ENDPOINT variable in omsadmin.conf from the server XML
     def apply_dsc_endpoint(server_resp)
-      dsc_endpoint = ""
+      @pending_DSC_ENDPOINT = ""
 
       # Extract the DSC endpoint from the server response
       dsc_conf_regex = /<DscConfiguration.*<Endpoint>(?<endpoint>.*)<\/Endpoint>.*DscConfiguration>/
       dsc_conf_regex.match(server_resp) { |match|
-        dsc_endpoint = match["endpoint"]
+        @pending_DSC_ENDPOINT = match["endpoint"]
         # Insert escape characters before open and closed parentheses
-        dsc_endpoint = dsc_endpoint.gsub("(", "\\\\(").gsub(")", "\\\\)")
+        @pending_DSC_ENDPOINT = @pending_DSC_ENDPOINT.gsub("(", "\\\\(").gsub(")", "\\\\)")
       }
 
-      if dsc_endpoint.empty?
+      if @pending_DSC_ENDPOINT.empty?
         log_error("Could not extract the DSC endpoint.")
         return OMS::ERROR_EXTRACTING_ATTRIBUTES
       end
 
       # Update omsadmin.conf with dsc_endpoint variable
       # When apply_dsc_endpoint is called from onboarding, dsc_endpoint will be returned in file
-      update_config("DSC_ENDPOINT", dsc_endpoint)
+      if @current_DSC_ENDPOINT != @pending_DSC_ENDPOINT
+        log_info("DSC endpoint change detected, old: #{@current_DSC_ENDPOINT}, new: #{@pending_DSC_ENDPOINT}. Updating omsadmin.conf ...")
+        update_config("DSC_ENDPOINT", @pending_DSC_ENDPOINT)
+        @current_DSC_ENDPOINT = @pending_DSC_ENDPOINT
+        @pending_metaconfig_generation = true
+      end
 
-      return dsc_endpoint
+      return @current_DSC_ENDPOINT
+    end
+
+    # Generate the DSC MetaConfig file. If the dsc endpoint is updated, DSC will
+    # not directly pick the endpoint from omsadmin.conf (instead, it is picked
+    # from MetaConfig.mof), so we must manually trigger metaconfig (re)generation.
+    def generate_dsc_metaconfig
+      # Avoid calling the generation script if unnecessary
+      return if !@pending_metaconfig_generation
+
+      # If DSC is disabled, we delay MetaConfig generation until the next topology request where it has been re-enabled
+      if OMS::Configuration.is_dsc_disabled
+        log_info("DSC has been disabled, skipping DSC metaconfig generation")
+        return
+      end
+
+      retries = 0
+      max_retries = 3
+      log_info("Beginning DSC megaconfig generation")
+      while retries < max_retries
+        success = call_oms_metaconfighelper
+        if success
+          @pending_metaconfig_generation = false
+          return
+        else
+          sleep 5
+          retries += 1
+        end
+      end
+
+      log_warn("Exceeded max attempts to generate DSC metaconfig, will retry after next topology request")
+    end
+
+    # Call OMS_MetaConfigHelper.py to trigger metaconfig generation, return success
+    def call_oms_metaconfighelper
+      # Note that OMS_MetaConfigHelper.py will log to omsconfig.log
+      command = "/opt/microsoft/omsconfig/Scripts/OMS_MetaConfigHelper.py"
+      timeout = 10
+      begin
+        Open3.popen2(command, :pgroup=>true) do |_, _, wait_thr|
+          pid = wait_thr.pid
+          pgid = Process.getpgid(pid)
+          deadline = Time.now + timeout
+          sleep 0.5 until Time.now > deadline or !wait_thr.status
+          if wait_thr.status # Still hasn't completed
+            begin
+              `pkill -TERM -g #{pgid}`
+              sleep 1
+              if wait_thr.status
+                `pkill -KILL -g #{pgid}`
+              end
+            rescue => e
+              log_error("Failed to kill process(es) for command '#{command}'. #{e}")
+            end
+            log_warn("DSC metaconfig generation failed due to subprocess timeout")
+            return false
+          elsif wait_thr.value.exitstatus != 0 # Nonzero exit
+            log_warn("DSC metaconfig generation failed with nonzero exit code #{wait_thr.value.exitstatus}, check omsconfig.log for details")
+            return false
+          end
+        end
+      rescue => e
+        log_error("DSC metaconfig generation failed due to subprocess call failure. #{e}")
+        return false
+      end
+
+      log_info("DSC metaconfig generation succeeded.")
+      return true
     end
 
     # Pass the server response from an XML file to apply_dsc_endpoint and apply_certificate_update_endpoint
     # Save DSC_ENDPOINT and CERTIFICATE_UPDATE_ENDPOINT variables in file to be read outside of this script
     def apply_endpoints_file(xml_file, output_file)
       if !OMS::Common.file_exists_nonempty(xml_file)
+        log_error("Missing configuration file: #{xml_file}")
         return OMS::MISSING_CONFIG_FILE
       end
 
