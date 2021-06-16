@@ -335,7 +335,9 @@ module Fluent
         dataItems.each {|item| 
           if item.has_key?("ConfigChangeType") and item["ConfigChangeType"] == "Files" and item.has_key?("Collections")
              item["Collections"].each {|collection|
-                if !@@ContentlocationUri.nil? and !@@ContentlocationUri.empty? and !collection.empty?
+              contentLength = collection["Contents"].to_i
+              fileSize = collection["Size"].to_i 
+              if contentLength != "0" and contentLength >= fileSize and !@@ContentlocationUri.nil? and !@@ContentlocationUri.empty? and !collection.empty?
                    key = collection["CollectionName"]
                    date = collection["DateModified"]
                    fileName = date + '-' + File.basename(key)
