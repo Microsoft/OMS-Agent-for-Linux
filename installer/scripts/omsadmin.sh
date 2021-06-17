@@ -1,5 +1,7 @@
 #!/bin/sh
 
+umask 022
+
 set -e
 
 VAR_DIR=/var/opt/microsoft/omsagent
