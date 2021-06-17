@@ -300,7 +300,7 @@ module Fluent
                             _uploadData = _json["DataItems"].reject {|x| x["SubType"] == NPM_DIAG}
                             _diagLogs   = _json["DataItems"].select {|x| x["SubType"] == NPM_DIAG}
                             _validUploadDataItems = Array.new
-                            _batchTime = Time.now.utc.strftime("%Y-%m-%d %H:%M:%SZ")
+                            #_batchTime = Time.now.utc.strftime("%Y-%m-%d %H:%M:%SZ")
                             _subtypeList = ["EndpointHealth", "EndpointPath", "ExpressRoutePath", "EndpointDiagnostics", "ConnectionMonitorTestResult", "ConnectionMonitorPath", "NetworkAgentDiagnostics"]
                             _uploadData.each do |item|
                                 item["TimeGenerated"] = _batchTime

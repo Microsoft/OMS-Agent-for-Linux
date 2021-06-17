@@ -309,7 +309,7 @@ module NPMDConfig
                     _ruleHash["IngestionWorkspaceId"] = _iRule.has_key?("IngestionWorkspaceId") ? _iRule["IngestionWorkspaceId"] : String.new
                     _ruleHash["WorkspaceAlias"] = _iRule.has_key?("WorkspaceAlias") ? _iRule["WorkspaceAlias"] : String.new
                     _ruleHash["Redirect"] = "false"
-                    _ruleHash["WorkspaceResourceID"] = _iRule["WorkspaceResourceID"];
+                    _ruleHash["WorkspaceResourceId"] = _iRule["WorkspaceResourceID"];
                     _ruleHash["DiscoverPaths"] = _iRule.has_key?("DiscoverPaths") ? _iRule["DiscoverPaths"].to_s : "true"
                     _ruleHash["NetTests"] = (_iRule["NetworkThresholdLoss"].to_i >= -2 and _iRule["NetworkThresholdLatency"].to_i >= -2) ? "true" : "false"
                     _ruleHash["AppTests"] = (_iRule["AppThresholdLatency"].to_i >= -2) ? "true" : "false"
@@ -1068,6 +1068,7 @@ module NPMContract
                                                     "HopAddresses",
                                                     "HopTypes",
                                                     "HopLinkTypes",
+                                                    "HopLinkLatencies",
                                                     "HopResourceIds",
                                                     "Issues",
                                                     "Hops",
