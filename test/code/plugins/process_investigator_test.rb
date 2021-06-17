@@ -6,7 +6,7 @@ class ProcessInvestigatorLibTest < Test::Unit::TestCase
 
     @@expectedMachineName = (OMS::Common.get_hostname or "Unknown Host")
     @@expectedOSName = "Linux " + (OMS::Common.get_os_full_name or "Unknown Distro")
-    @@expectedPIVersion = "1.19.0930.0003"
+    @@expectedPIVersion = "1.20.0605.0001"
     @@sampleSessionId = "11223344-5566-7788-9900-aabbccddeeff"
 
     def test_process_investigator_regular_output
@@ -24,151 +24,170 @@ class ProcessInvestigatorLibTest < Test::Unit::TestCase
     	pi_filter_msg = {"message" => @@sampleSessionId + " " + pi_results}
         data_items = run_pi_test(pi_filter_msg, @@sampleSessionId)
 
-        assert_equal(3, data_items.length, "Number of Data Items incorrect")
-
-        pi_result = data_items[0]["PiResults"]
+        assert_equal(5, data_items.length, "Number of Data Items incorrect")
 
         pi_result_json=nil
-        assert_nothing_raised do pi_result_json = JSON.parse(pi_result) end
+        assert_equal("Telemetry", data_items[0]["PIEventType"])
+        assert_nothing_raised do pi_result_json = JSON.parse(data_items[0]["PiResults"]) end
         assert_not_equal("", pi_result_json.to_s, "Empty 'PiResults' value")
 
+        assert_equal("Telemetry", data_items[1]["PIEventType"])
         assert_nothing_raised do pi_result_json = JSON.parse(data_items[1]["PiResults"]) end
+        assert_not_equal("", pi_result_json["processInfo"].to_s, "Empty 'Process Telemetry 1' value")
+        assert_not_equal("", pi_result_json.to_s, "Empty 'Process Telemetry 1' value")
+        assert(pi_result_json["processInfo"].is_a?(Hash), "Process Info formatted incorrectly")
+    
+        assert_equal("Alert", data_items[2]["PIEventType"])
+        assert_nothing_raised do pi_result_json = JSON.parse(data_items[2]["PiResults"]) end
         assert_not_equal("", pi_result_json.to_s, "Empty 'Alert 1' value")
 
-        assert_nothing_raised do pi_result_json = JSON.parse(data_items[2]["PiResults"]) end
+        assert_equal("Telemetry", data_items[3]["PIEventType"])
+        assert_nothing_raised do pi_result_json = JSON.parse(data_items[3]["PiResults"]) end
+        assert_not_equal("", pi_result_json["processInfo"].to_s, "Empty 'Process Telemetry 1' value")
+        assert_not_equal("", pi_result_json.to_s, "Empty 'Process Telemetry 2' value")
+        assert(pi_result_json["processInfo"].is_a?(Hash), "Process Info formatted incorrectly")
+    
+        assert_equal("Alert", data_items[4]["PIEventType"])
+        assert_nothing_raised do pi_result_json = JSON.parse(data_items[4]["PiResults"]) end
         assert_not_equal("", pi_result_json.to_s, "Empty 'Alert 2' value")
-
-        assert(pi_result_json["connections"].kind_of?(Array), "Incorrect 'connections' element.")
     end
 
     def test_process_investigator_empty_json
         expected_session_id = "00000000-0000-0000-0000-000000000000"
         pi_filter_msg = {"message" => expected_session_id + ' {}'}
-        data_items = run_pi_test(pi_filter_msg, expected_session_id)
-        assert_equal(2, data_items.length, "Number of Data Items incorrect")
+        pi_result = run_basic_pi_test(pi_filter_msg, expected_session_id)
 
-        assert_equal("{}", data_items[0]["PiResults"], "Incorrect 'PiResults' value")
-        assert_equal("Process Investigator failed to parse alerts: processList malformed", data_items[1]["PiResults"], "Incorrect 'PiResults' value for alert parsing error")
+        assert_equal("{}", pi_result, "Incorrect 'PiResults' value")
     end
 
     def test_process_investigator_malformed_processlist
         expected_session_id = "00000000-0000-0000-0000-000000000000"
         pi_filter_msg = {"message" => expected_session_id + ' {"processList":"This is a string"}'}
-        data_items = run_pi_test(pi_filter_msg, expected_session_id)
-        assert_equal(2, data_items.length, "Number of Data Items incorrect")
-
-        assert_equal('{"processList":"This is a string"}', data_items[0]["PiResults"], "Incorrect 'PiResults' value")
-        assert_equal("Process Investigator failed to parse alerts: processList malformed", data_items[1]["PiResults"], "Incorrect 'PiResults' value for alert parsing error")
+        pi_result = run_basic_pi_test(pi_filter_msg, expected_session_id)
+        
+        assert_equal('{"processList":"This is a string"}', pi_result, "Incorrect 'PiResults' value")
     end
 
     def test_process_investigator_malformed_processitem
         expected_session_id = "00000000-0000-0000-0000-000000000000"
         pi_filter_msg = {"message" => expected_session_id + ' {"processList":["This is a string"]}'}
         data_items = run_pi_test(pi_filter_msg, expected_session_id)
-        assert_equal(2, data_items.length, "Number of Data Items incorrect")
-
-        assert_equal('{"processList":["This is a string"]}', data_items[0]["PiResults"], "Incorrect 'PiResults' value")
-        assert_equal("Process Investigator failed to parse alerts: process item malformed", data_items[1]["PiResults"], "Incorrect 'PiResults' value for alert parsing error")
+        assert_equal({"processList"=>[{"classification"=>"Unknown","processName"=>"Unknown"}]}.to_json, data_items[0]["PiResults"], "Incorrect 'PiResults' value")
+        assert_equal(get_basic_error_result("ProcessInfoInvalid", "This is a string"), data_items[1]["PiResults"], "Incorrect 'PiResults' value")
     end
 
     def test_process_investigator_nullsessionid_errormessage
         expected_session_id = "00000000-0000-0000-0000-000000000000"
         pi_filter_msg = {"message" => expected_session_id + " Unhandled timeout in PI."}
-        pi_result = run_basic_pi_test(pi_filter_msg, expected_session_id, expectAlertError: true)
+        pi_result = run_basic_pi_test(pi_filter_msg, expected_session_id)
 
-        assert_equal("Unhandled timeout in PI.", pi_result, "Incorrect 'PiResults' value")
+        assert_equal(get_basic_error_result("InvalidOutput", "Unhandled timeout in PI."), pi_result, "Incorrect 'PiResults' value")
     end
 
     def test_process_investigator_nil_message
         pi_result = run_basic_pi_test(nil)
 
-        assert_equal("Process Investigator Filter failed. Empty message.", pi_result, "Incorrect 'PiResults' value")
+        assert_equal(get_basic_error_result("OutputEmpty", "Process Investigator Filter failed. Empty message."), pi_result, "Incorrect 'PiResults' value")
     end
 
     def test_process_investigator_empty_string_message
          pi_result = run_basic_pi_test("")
 
-         assert_equal("Process Investigator Filter failed. Empty message.", pi_result, "Incorrect 'PiResults' value")
+         assert_equal(get_basic_error_result("OutputEmpty", "Process Investigator Filter failed. Empty message."), pi_result, "Incorrect 'PiResults' value")
     end
 
     def test_process_investigator_string_message
-        pi_result = run_basic_pi_test("Test String", expectAlertError: true)
+        pi_result = run_basic_pi_test("Test String")
 
-        assert_equal("Test String", pi_result, "Incorrect 'PiResults' value")
+        assert_equal(get_basic_error_result("MissingSessionId", "Test String"), pi_result, "Incorrect 'PiResults' value")
     end
 
     def test_process_investigator_int_message
-        pi_result = run_basic_pi_test(123, expectAlertError: true)
+        pi_result = run_basic_pi_test(123)
 
-        assert_equal("123", pi_result, "Incorrect 'PiResults' value")
+        assert_equal(get_basic_error_result("MissingSessionId", "123"), pi_result, "Incorrect 'PiResults' value")
     end
 
     def test_process_investigator_empty_message
         pi_filter_msg = {"message" => ""}
         pi_result = run_basic_pi_test(pi_filter_msg)
 
-        assert_equal("Process Investigator Filter failed. Empty message.", pi_result, "Incorrect 'PiResults' value")
+        assert_equal(get_basic_error_result("OutputEmpty", "Process Investigator Filter failed. Empty message."), pi_result, "Incorrect 'PiResults' value")
     end
 
     def test_process_investigator_empty_results_no_space
         pi_filter_msg = {"message" => @@sampleSessionId}
-        pi_result = run_basic_pi_test(pi_filter_msg, @@sampleSessionId, expectAlertError: true)
+        pi_result = run_basic_pi_test(pi_filter_msg, @@sampleSessionId)
 
-        assert_equal("", pi_result, "Incorrect 'PiResults' value")
+        assert_equal(get_basic_error_result("InvalidOutput",""), pi_result, "Incorrect 'PiResults' value")
     end
 
     def test_process_investigator_empty_results_with_space
         pi_filter_msg = {"message" => @@sampleSessionId + " "}
-        pi_result = run_basic_pi_test(pi_filter_msg, @@sampleSessionId, expectAlertError: true)
+        pi_result = run_basic_pi_test(pi_filter_msg, @@sampleSessionId)
 
-        assert_equal("", pi_result, "Incorrect 'PiResults' value")
+        assert_equal(get_basic_error_result("InvalidOutput",""), pi_result, "Incorrect 'PiResults' value")
     end
 
     def test_process_investigator_single_char_result
         pi_filter_msg = {"message" => @@sampleSessionId + " A"}
-        pi_result = run_basic_pi_test(pi_filter_msg, @@sampleSessionId, expectAlertError: true)
+        pi_result = run_basic_pi_test(pi_filter_msg, @@sampleSessionId)
 
-        assert_equal("A", pi_result, "Incorrect 'PiResults' value")
+        assert_equal(get_basic_error_result("InvalidOutput", "A"), pi_result, "Incorrect 'PiResults' value")
     end
 
     def test_process_investigator_invalid_sessionid
         pi_filter_msg = {"message" => "11223344-5566-7788-9900-aabbccddefg Test"}
-        pi_result = run_basic_pi_test(pi_filter_msg, expectAlertError: true)
+        pi_result = run_basic_pi_test(pi_filter_msg)
 
-        assert_equal("11223344-5566-7788-9900-aabbccddefg Test", pi_result, "Incorrect 'PiResults' value")
+        assert_equal(get_basic_error_result("MissingSessionId", "11223344-5566-7788-9900-aabbccddefg Test"), pi_result, "Incorrect 'PiResults' value")
     end
 
     def test_process_investigator_short_result_no_sessionid
         pi_filter_msg = {"message" => "Short Test"}
-        pi_result = run_basic_pi_test(pi_filter_msg, expectAlertError: true)
+        pi_result = run_basic_pi_test(pi_filter_msg)
 
-        assert_equal("Short Test", pi_result, "Incorrect 'PiResults' value")
+
+        assert_equal(get_basic_error_result("MissingSessionId", "Short Test"), pi_result, "Incorrect 'PiResults' value")
     end
 
     def test_process_investigator_long_result_no_sessionid
         pi_filter_msg = {"message" => "Long result, this line is more than 36 characters, the length of a uuid."}
-        pi_result = run_basic_pi_test(pi_filter_msg, expectAlertError: true)
+        pi_result = run_basic_pi_test(pi_filter_msg)
 
-        assert_equal("Long result, this line is more than 36 characters, the length of a uuid.", pi_result, "Incorrect 'PiResults' value")
+        assert_equal(get_basic_error_result("MissingSessionId", "Long result, this line is more than 36 characters, the length of a uuid."), pi_result, "Incorrect 'PiResults' value")
     end
 
     def test_process_investigator_truncated
         # create string of over 100k '0' characters
-        pi_filter_msg = {"message" => @@sampleSessionId + " " + "".rjust(111111, "0")}
-        pi_result = run_basic_pi_test(pi_filter_msg, @@sampleSessionId, expectAlertError: true)
+        longMsg = 
+        pi_filter_msg = {"message" => @@sampleSessionId + " " + {"value"=>"".ljust(111111, "0")}.to_json}
+        pi_result = run_basic_pi_test(pi_filter_msg, @@sampleSessionId)
 
-        assert_match(/^0{100000} \.\.\. TRUNCATED DATA$/, pi_result, "Incorrect 'PiResults' value")
+        assert_match(/^{"value":"0{99990} \.\.\. TRUNCATED DATA$/, pi_result, "Incorrect 'PiResults' value")
     end
 
+    def test_process_investigator_truncated_proc_info
+        # create string of over 100k '0' characters
+        pi_filter_msg = {"message" => @@sampleSessionId + " " + {"processList"=>[{"processName"=>"testprocess", "processPath" => "".ljust(111111, "0")}]}.to_json}
+        data_items = run_pi_test(pi_filter_msg, @@sampleSessionId)
 
-    def run_basic_pi_test(filter_data, expected_session_id = nil, expectAlertError: false)
+        assert_equal(2, data_items.length, "Number of Data Items incorrect")
+
+        pi_result_json=nil
+        assert_equal("Telemetry", data_items[0]["PIEventType"])
+        assert_nothing_raised do pi_result_json = JSON.parse(data_items[0]["PiResults"]) end
+        assert_not_equal("", pi_result_json.to_s, "Empty 'PiResults' value")
+
+        assert_equal("Telemetry", data_items[1]["PIEventType"])
+        assert_nothing_raised do pi_result_json = JSON.parse(data_items[1]["PiResults"]) end
+        assert_not_equal("", pi_result_json.to_s, "Empty 'Process Telemetry 1' value")
+        assert_match(/^{"processName":"testprocess","processPath":"0{99956} \.\.\. TRUNCATED DATA$/, pi_result_json["logs"][0]["Message"], "Incorrect 'PiResults' value")
+    end
+
+    def run_basic_pi_test(filter_data, expected_session_id = nil)
         data_items=run_pi_test(filter_data, expected_session_id)
-        if expectAlertError
-            assert_equal(2, data_items.length, "Number of Data Items incorrect")
-            assert_match(/^Process Investigator failed to parse alerts/, data_items[1]["PiResults"], "Incorrect PiResults for Alert Parsing Error")
-        else
-            assert_equal(1, data_items.length, "Number of Data Items incorrect")
-        end
+        assert_equal(1, data_items.length, "Number of Data Items incorrect")
         return data_items[0]["PiResults"]
     end
 
@@ -193,5 +212,10 @@ class ProcessInvestigatorLibTest < Test::Unit::TestCase
             assert_equal(expected_session_id, pi_item["SessionId"], "Incorrect 'SessionId' value")
         end
         return pi_blob["DataItems"]
+    end
+
+    def get_basic_error_result(errorString, errorMessage)
+        basicErrorResult = {"logs"=>[{"Level"=>"Error", "ErrorString" => errorString, "Message"=>errorMessage}], "ScanSummary"=>{"scanOutcome"=>"Failed"}}.to_json
+        return basicErrorResult
     end
 end
