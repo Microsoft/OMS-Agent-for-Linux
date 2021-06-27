@@ -576,6 +576,7 @@ onboard()
     if [ $CURL_VERSION_SYSTEM -gt $CURL_VERSION_WITH_DEFAULT_HTTP2 ]; then
       CURL_HTTP_COMMAND="--http1.1"
     fi
+    CURL_URL=`https://${WORKSPACE_ID}.oms.${URL_TLD}/AgentService.svc/LinuxAgentTopologyRequest`
 
     RET_CODE=`curl --header "x-ms-Date: $REQ_DATE" \
         --header "x-ms-version: August, 2014" \
@@ -589,7 +590,7 @@ onboard()
         --cert "$FILE_CRT" --key "$FILE_KEY" \
         --output "$RESP_ONBOARD" $CURL_VERBOSE \
         --write-out "%{http_code}\n" $PROXY_SETTING \
-        https://${WORKSPACE_ID}.oms.${URL_TLD}/AgentService.svc/LinuxAgentTopologyRequest` || error=$?
+        $CURL_URL` || error=$?
 
     if [ $error -eq $CURL_HOST_RESOLVE_ERROR -a -z "$PROXY_SETTING" ]; then
         log_error "Error resolving host during the onboarding request. Check the correctness of the workspace ID and the internet connectivity, or add a proxy."
@@ -604,7 +605,7 @@ onboard()
         cleanup_certs
         return $INVALID_PROXY
     elif [ $error -ne 0 ]; then
-        log_error "Error during the onboarding request: curl returned $error. Check the correctness of the workspace ID and shared key or run omsadmin.sh with '-v'"
+        log_error "Error during the onboarding request: curl returned $error when trying to connect to $CURL_URL . Check the correctness of the workspace ID and shared key, as well as the connectivity to the url, or run omsadmin.sh with '-v' to get verbose output"
         cleanup_certs
         return $ERROR_ONBOARDING
     fi
