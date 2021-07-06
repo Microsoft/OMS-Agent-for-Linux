@@ -99,6 +99,10 @@ fi
 if [ $(uname -m) = 'x86_64' ]; then
     # x64 architecture
     wget -O ${BUNDLE_X64} ${GITHUB_RELEASE_X64}${BUNDLE_X64} && $SUDO sh ./${BUNDLE_X64} ${bundleParameters}
+
+elif [ $(uname -m) = 'ppc64le' ]; then
+    wget -O ${BUNDLE_X64} ${GITHUB_RELEASE_X64}${BUNDLE_X64} && $SUDO sh ./${BUNDLE_X64} ${bundleParameters}
+
 else
     # x86 architecture
     echo "Note that there will be no further releases of the 32-bit OMS Linux agent."
