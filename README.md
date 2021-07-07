@@ -24,6 +24,14 @@ For Azure Monitor Log Analytics workspace in Azure Government cloud:
 wget https://raw.githubusercontent.com/Microsoft/OMS-Agent-for-Linux/master/installer/scripts/onboard_agent.sh && sh onboard_agent.sh -w <YOUR WORKSPACE ID> -s <YOUR WORKSPACE PRIMARY KEY> -d opinsights.azure.us
 ```
 
+To review the status of the OMS Agent installed on your Linux device, run the following command for a variety of useful information.  
+
+```
+sudo sh /opt/microsoft/omsagent/bin/omsadmin.sh
+```
+
+The `-l` switch, for example, will list the currently connected OMS Workspaces for this agent.  For full usage details, run the command without any parameters. 
+
 ## Azure Install guide
 If you are an Azure customer, we have an Azure VM extension that allows you to easily onboard to Azure Monitor Log Analytics workspace.
 * [Log Analytics Agent for Linux Azure VM extension documentation](https://docs.microsoft.com/azure/virtual-machines/extensions/oms-linux?toc=%2Fazure%2Fazure-monitor%2Ftoc.json)
