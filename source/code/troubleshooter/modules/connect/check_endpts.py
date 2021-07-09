@@ -30,29 +30,28 @@ def check_endpt_ssl(ssl_cmd, endpoint):
                 verified = True
                 continue
 
-        if (connected and verified):
-            return True
-        else:
-            return False
+        return (connected, verified)
     except Exception:
-        return False
+        return (False, False)
 
 
 
 # check general internet connectivity
 def check_internet_connect():
-    if (check_endpt_ssl(SSL_CMD, "docs.microsoft.com")):
+    (connected_docs, verified_docs) = check_endpt_ssl(SSL_CMD, "docs.microsoft.com")
+    if (connected_docs and verified_docs):
         return NO_ERROR
+    elif (connected_docs and not verified_docs):
+        error_info.append((SSL_CMD.format("docs.microsoft.com"),))
+        return WARN_INTERNET
     else:
         error_info.append((SSL_CMD.format("docs.microsoft.com"),))
-        return ERR_INTERNET
+        return WARN_INTERNET_CONN
 
 
 
 # check agent service endpoint
 def check_agent_service_endpt():
-    ssl_command = SSL_CMD
-
     # get endpoint
     dsc_endpt = geninfo_lookup('DSC_ENDPOINT')
     if (dsc_endpt == None):
@@ -61,19 +60,33 @@ def check_agent_service_endpt():
     agent_endpt = dsc_endpt.split('/')[2]
 
     # check without certs
-    if (check_endpt_ssl(ssl_command, agent_endpt)):
+    (dsc_connected, dsc_verified) = check_endpt_ssl(SSL_CMD, agent_endpt)
+    if (dsc_connected and dsc_verified):
         return NO_ERROR
+
     else:
         # try with certs (if they exist)
         if (os.path.isfile(CERT_PATH) and os.path.isfile(KEY_PATH)):
             ssl_command = "{0} -cert {1} -key {2}".format(SSL_CMD, CERT_PATH, KEY_PATH)
-            if (check_endpt_ssl(ssl_command, agent_endpt)):
+            (dsc_cert_connected, dsc_cert_verified) = check_endpt_ssl(ssl_command, agent_endpt)
+            # with certs connected and verified
+            if (dsc_cert_connected and dsc_cert_verified):
                 return NO_ERROR
+            # with certs connected, but didn't verify
+            elif (dsc_cert_connected and not dsc_cert_verified):
+                error_info.append((agent_endpt, ssl_command.format(agent_endpt)))
+                return WARN_ENDPT
         else:
             # lets user know cert and key aren't there
             print("NOTE: Certificate and key files don't exist, OMS isn't onboarded.")
 
-        error_info.append((agent_endpt, ssl_command.format(agent_endpt)))
+        # if certs didn't work at all, check to see if no certs was connected (but not verified)
+        if (dsc_connected and not dsc_verified):
+            error_info.append((agent_endpt, SSL_CMD.format(agent_endpt)))
+            return WARN_ENDPT
+
+        # neither with nor without certs connected
+        error_info.append((agent_endpt, SSL_CMD.format(agent_endpt)))
         return ERR_ENDPT
 
 
@@ -83,6 +96,8 @@ def check_agent_service_endpt():
 def check_log_analytics_endpts():
     success = NO_ERROR
     no_certs_printed = False
+    connected_err = []
+    verified_err = []
 
     # get OMS endpoint to check if fairfax region
     oms_endpt = geninfo_lookup('OMS_ENDPOINT')
@@ -106,27 +121,51 @@ def check_log_analytics_endpts():
             "ods.systemcenteradvisor.com"]
 
     for endpt in log_analytics_endpts:
-        ssl_command = SSL_CMD
-
         # replace '*' with workspace ID
         if ('*' in endpt):
             endpt = endpt.replace('*', workspace_id)
 
         # check endpoint without certs
-        if (not check_endpt_ssl(ssl_command, endpt)):
+        (la_connected, la_verified) = check_endpt_ssl(SSL_CMD, endpt)
+        if (not (la_connected or la_verified)):
             # try with certs (if they exist)
             if (os.path.isfile(CERT_PATH) and os.path.isfile(KEY_PATH)):
                 ssl_command = "{0} -cert {1} -key {2}".format(SSL_CMD, CERT_PATH, KEY_PATH)
-                if (not check_endpt_ssl(ssl_command, endpt)):
-                    error_info.append((endpt, ssl_command.format(endpt)))
+                (la_cert_connected, la_cert_verified) = check_endpt_ssl(ssl_command, endpt)
+
+                # didn't connect or verify with certs
+                if (not (la_cert_connected or la_cert_verified)):
+                    connected_err.append((endpt, ssl_command.format(endpt)))
                     success = ERR_ENDPT
+
+                # connected but didn't verify with certs
+                elif (la_cert_connected and not la_cert_verified):
+                    # haven't run into a connected error already
+                    if (success != ERR_ENDPT):
+                        verified_err.append((endpt, ssl_command.format(endpt)))
+                        success = WARN_ENDPT
+
             else:
                 # lets user know cert and key aren't there
                 if (not no_certs_printed):
                     print("NOTE: Certificate and key files don't exist, OMS isn't onboarded.")
                     no_certs_printed = True
 
-                error_info.append((endpt, ssl_command.format(endpt)))
+                # if certs didn't work at all, check to see if no certs was connected (but not verified)
+                if (la_connected and not la_verified):
+                    # haven't run into a connected error already
+                    if (success != ERR_ENDPT):
+                        verified_err.append((endpt, SSL_CMD.format(endpt)))
+                        success = WARN_ENDPT
+
+                # neither with nor without certs connected
+                connected_err.append((endpt, SSL_CMD.format(endpt)))
                 success = ERR_ENDPT
 
+    # if any connection issues found
+    if (success == ERR_ENDPT):
+        error_info.extend(connected_err)
+    # if no connection issues found but some verification issues found
+    elif (success == WARN_ENDPT):
+        error_info.extend(verified_err)
     return success

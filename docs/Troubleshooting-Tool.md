@@ -126,7 +126,7 @@ Below is a list of the errors that can be caught by the troubleshooter:
 | WARN_LOG_WARNS | 127 | Warning in logs |
 | ERR_HEARTBEAT | 128 | Heartbeats failing to send data to workspace |
 | ERR_MULTIHOMING | 129 | Running multihoming |
-| ERR_INTERNET | 130 | Couldn't connect to internet |
+| WARN_INTERNET_CONN | 130 | Couldn't connect to internet |
 | ERR_QUERIES | 131 | Queries failed |
 | ERR_SYSLOG_WKSPC | 132 | Syslog collecting to wrong workspace |
 | ERR_PT | 133 | Wrong number of '@'s in omsagent95 paths |
@@ -151,3 +151,5 @@ Below is a list of the errors that can be caught by the troubleshooter:
 | ERR_PKG | 152 | Couldn't find package |
 | ERR_BACKEND_CONFIG | 153 | Can't pull config from backend |
 | ERR_PYTHON_PKG | 154 | Missing Python package |
+| WARN_INTERNET | 155 | Couldn't verify SSL connection to internet |
+| WARN_ENDPT | 156 | Endpoint SSL connection couldn't be verified |

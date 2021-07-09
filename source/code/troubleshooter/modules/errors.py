@@ -18,7 +18,8 @@ err_summary = []
 
 
 # set of all errors which are actually warnings
-warnings = set([WARN_FILE_PERMS, WARN_LOG_ERRS, WARN_LOG_WARNS, WARN_LARGE_FILES])
+warnings = set([WARN_FILE_PERMS, WARN_LOG_ERRS, WARN_LOG_WARNS, WARN_LARGE_FILES, \
+                WARN_INTERNET_CONN, WARN_INTERNET, WARN_ENDPT])
 
 # dictionary correlating error codes to error messages
 error_messages = {
@@ -72,7 +73,7 @@ error_messages = {
     ERR_HEARTBEAT : "Heartbeats are failing to send data to the workspace.",
     ERR_MULTIHOMING : "Machine registered with more than one log analytics workspace. List of "\
           "workspaces: {0}",
-    ERR_INTERNET : "Machine is not connected to the internet: openssl command failed. "\
+    WARN_INTERNET_CONN : "Machine is not connected to the internet: openssl command failed. "\
           "Please run the command below for more information on the failure:\n"\
           "\n  $ {0}\n",
     ERR_QUERIES : "The following queries failed: {0}.",
@@ -133,7 +134,12 @@ error_messages = {
           "Please also check out the below link for more information:\n"\
           "\n    https://docs.microsoft.com/en-us/azure/azure-monitor/platform/agent-linux-troubleshoot#issue-you-are-not-seeing-any-custom-log-data",
     ERR_PYTHON_PKG : "This version of Python is missing the {0} package. (You can check by opening up "\
-          "python and typing 'import {0}'.) Please install this package and run the troubleshooter again."
+          "python and typing 'import {0}'.) Please install this package and run the troubleshooter again.",
+    WARN_INTERNET : "SSL connection couldn't be verified. Please run the command below for more information on this warning:\n"\
+          "\n  $ {0}\n",
+    WARN_ENDPT : "SSL connected to {0} couldn't be verified. "\
+          "Please run the command below for more information:\n"\
+          "\n  $ {1}\n",
 
 }
 
